@@ -40,7 +40,9 @@ design is optimizing a number nobody needed. Establish, roughly:
   (copper weight, min trace/space). These are *inputs, not knobs*: don't let an
   optimizer pick a magnet that doesn't exist.
 
-Write them into the session directory so they survive your enthusiasm. For our worked
+Write them into the session directory so they survive your enthusiasm
+(`pcb-motor new` seeds a commented `requirements.yaml` skeleton with exactly these
+keys if the file doesn't exist yet). For our worked
 example, `designs/pancake80/requirements.yaml`:
 
 ```yaml
@@ -63,7 +65,8 @@ stock:
 
 A session is created with `pcb-motor new --session <name>`, which saves a `MotorDesign`
 (defaults + your `--set` overrides) into `designs/<name>/motor.json` and immediately
-evaluates it. All `--set` fields are SI (`_m`, `_hz` suffixes mean what they say).
+evaluates it. All `--set` fields are SI (`_m`, `_hz` suffixes mean what they say);
+`pcb-motor fields` prints every settable field, grouped, with its default and meaning.
 
 The knobs, grouped. Defaults in parentheses.
 
@@ -353,10 +356,21 @@ pcb-motor export --session pancake80 --single-coil --out designs/pancake80/coil.
 
 Drop `--single-coil` for the whole front layer.
 
-### Production: the `pcb_motor.kicad` API
+### Production: `pcb-motor footprint` (or the `pcb_motor.kicad` API)
 
-The real stator artwork is built by two Python calls (they're an API rather than CLI
-subcommands because their reports are worth inspecting programmatically):
+The one-command version builds the verified stator footprint into the session dir and
+prints the report summary; `--project` also generates the KiCad project:
+
+```bash
+pcb-motor footprint --session pancake80 [--single-tooth] [--project]
+# footprint written to designs/pancake80/stator_full_2side.kicad_mod
+#   result           PASS
+#   worst clearance  0.214 mm (need >= 0.200 mm)
+#   ...
+```
+
+The same artwork is available as two Python calls when you want to inspect the
+reports programmatically:
 
 ```python
 from pcb_motor.session import Session

@@ -93,8 +93,14 @@ KiCad footprint written to designs/my-first-motor/coil.kicad_mod (single coil: 1
 1557 fp_line segments, width 0.150 mm on F.Cu)
 ```
 
-Other subcommands: `config` (setup figure), `compare` (sessions side by side),
+Other subcommands: `fields` (every settable `MotorDesign` field, grouped, with
+defaults and meanings), `footprint` (the production two-sided filled-copper stator
+footprint, clearance-verified; `--project` adds the KiCad symbol/schematic project),
+`config` (setup figure), `compare` (sessions side by side),
 `sweep` / `optimize` (interactive dashboards and optuna, with the `[sweep]` extra).
+`new` also drops a commented `requirements.yaml` skeleton into the session dir —
+fill in your torque/speed/voltage/envelope/duty targets so the design and its
+requirements travel together.
 
 Here's a 36-slot / 42-pole demo winding the engine generated, and the actual
 Biot–Savart field its rotor puts through the stator plane:

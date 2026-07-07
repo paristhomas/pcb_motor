@@ -51,3 +51,94 @@ def test_compare_two_sessions(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "| Parameter | a | b |" in out
+
+
+COARSE = ["--set", "coil_resolution_m=2e-3", "--set", "commutation_steps=4"]
+
+
+def test_point_prints_warnings_prominently(capsys):
+    """The default design fails the PWM-ripple gate; `point` must shout it."""
+    rc = main(["point"] + COARSE)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "WARNINGS (" in out
+    assert "!!!!" in out                       # the warning banner
+    assert "PWM ripple" in out and "Stage 5" in out
+
+
+def test_fields_lists_grouped_design_fields(capsys):
+    import dataclasses
+
+    from pcb_motor.design import MotorDesign
+
+    rc = main(["fields"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    # groups from the design.py section headers
+    assert "swept design variables" in out
+    assert "fixed context: rotor" in out
+    # inline comments from design.py are surfaced
+    assert "DC bus voltage [V]" in out
+    assert "PWM ripple budget as fraction of i_cont" in out
+    # every settable field is listed, with its default
+    for f in dataclasses.fields(MotorDesign):
+        assert f.name in out
+    assert "trace_width_m          = 0.00015" in out
+
+
+def test_new_writes_requirements_skeleton_once(tmp_path):
+    main(["new", "--session", "cand", "--root", str(tmp_path)] + COARSE)
+    s = Session("cand", root=tmp_path)
+    req = s.load_requirements()
+    assert req is not None
+    assert req.lstrip().startswith("#")        # commented guidance
+    for key in ("torque_mNm", "speed_rev_s", "voltage_V",
+                "envelope_od_mm", "envelope_axial_mm", "duty"):
+        assert key in req
+    # an existing requirements file is never clobbered
+    s.save_requirements("torque_mNm: 25\n")
+    main(["new", "--session", "cand", "--root", str(tmp_path)] + COARSE)
+    assert s.load_requirements() == "torque_mNm: 25\n"
+
+
+def test_footprint_command_single_tooth(tmp_path, capsys):
+    main(["new", "--session", "cand", "--root", str(tmp_path)] + COARSE)
+    capsys.readouterr()
+    rc = main(["footprint", "--session", "cand", "--root", str(tmp_path),
+               "--single-tooth", "--resolution-mm", "0.5"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert (tmp_path / "cand" / "stator_single_2side.kicad_mod").exists()
+    assert "result           PASS" in out
+    assert "worst clearance" in out and "need >=" in out
+    assert "coils            1 x" in out
+    assert "pads             2 (0A .. 0B)" in out
+    assert "vias per coil" in out
+
+
+def test_footprint_command_full_with_project(tmp_path, capsys):
+    main(["new", "--session", "cand", "--root", str(tmp_path)] + COARSE)
+    capsys.readouterr()
+    rc = main(["footprint", "--session", "cand", "--root", str(tmp_path),
+               "--resolution-mm", "0.5", "--project"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert (tmp_path / "cand" / "stator_full_2side.kicad_mod").exists()
+    assert "bridges          6" in out
+    kdir = tmp_path / "cand" / "kicad"
+    assert (kdir / "pcb_motor_stator.kicad_sch").exists()
+    assert (kdir / "pcb_motor.pretty" / "coil_full_2side.kicad_mod").exists()
+    assert "KiCad project written to" in out and "PASS" in out
+
+
+def test_footprint_command_fails_loudly_on_impossible_coil(tmp_path, capsys):
+    """A coil whose stitch corridor can't fit a via must exit non-zero with
+    the FootprintError message (numbers + remedy), not a traceback."""
+    main(["new", "--session", "bad", "--root", str(tmp_path)] + COARSE)
+    capsys.readouterr()
+    rc = main(["footprint", "--session", "bad", "--root", str(tmp_path),
+               "--single-tooth", "--resolution-mm", "0.5",
+               "--set", "r_inner_m=2e-3", "--set", "r_outer_m=12e-3"])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "FOOTPRINT FAILED:" in err

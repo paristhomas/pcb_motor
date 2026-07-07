@@ -146,3 +146,24 @@ def test_stator_plan_follows_layout_polarity():
             sa = dict(enumerate(layout))[ta][1]
             assert la == ("B" if sa > 0 else "A")
         assert clip == {f"{k}{l}" for pr in bridges for k, l in pr}
+
+
+def test_untapered_design_coercion_is_loud(tmp_path, capsys):
+    """tapered_traces=false is coerced to the tapered artwork; the builder must
+    say so in the report notes AND on stderr, telling the user to re-evaluate
+    (the emitted copper differs from what was simulated otherwise)."""
+    d = MotorDesign(tapered_traces=False)
+    out = tmp_path / "tooth.kicad_mod"
+    rep = build_footprint(d, str(out), single_tooth=True, resolution_m=RES)
+    assert any(n.startswith("tapered_traces coerced to true") for n in rep.notes)
+    assert any("re-evaluate with tapered_traces=true" in n for n in rep.notes)
+    err = capsys.readouterr().err
+    assert "WARNING" in err and "tapered_traces=false" in err
+
+
+def test_tapered_design_has_no_coercion_note(tmp_path, capsys):
+    d = MotorDesign(tapered_traces=True)
+    rep = build_footprint(d, str(tmp_path / "t.kicad_mod"), single_tooth=True,
+                          resolution_m=RES)
+    assert not any("coerced" in n for n in rep.notes)
+    assert "tapered_traces" not in capsys.readouterr().err

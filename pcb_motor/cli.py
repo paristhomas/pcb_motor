@@ -1,18 +1,20 @@
 """pcb-motor command-line interface.
 
     pcb-motor new          --session NAME [--set field=value ...]
+    pcb-motor fields       (grouped listing of every settable MotorDesign field)
     pcb-motor point        [--session NAME] [--set field=value ...]
     pcb-motor report       [--session NAME | --set ...]
     pcb-motor datasheet    [--session NAME | --set ...]
     pcb-motor compare      NAME1 NAME2 ...
+    pcb-motor footprint    --session NAME [--single-tooth] [--project]
     pcb-motor sweep        --inputs trace_width_mm,trace_space_mm [--serve]
     pcb-motor optimize     [--inputs ...] [--trials 100]
 
 (Equivalently ``python -m pcb_motor <subcommand>``.)
 
-``new``, ``point``, ``report``, ``datasheet`` and ``compare`` run the pure
-simulator (no bencher needed). ``sweep`` / ``optimize`` need holobench
-(``pip install "pcb-motor[sweep]"``).
+``new``, ``fields``, ``point``, ``report``, ``datasheet``, ``compare`` and
+``footprint`` run the pure simulator (no bencher needed). ``sweep`` /
+``optimize`` need holobench (``pip install "pcb-motor[sweep]"``).
 """
 
 from __future__ import annotations
@@ -81,9 +83,84 @@ def _print_point(design: MotorDesign) -> None:
     for label, key, unit in rows:
         print(f"  {label:28s} {r[key]:12.4g} {unit}")
     if r["warnings"]:
-        print("\nwarnings:")
+        print()
+        print("!" * 56)
+        print(f"WARNINGS ({len(r['warnings'])}):")
         for w in r["warnings"]:
-            print(f"  - {w}")
+            print(f"  ! {w}")
+        print("!" * 56)
+
+
+def _field_docs() -> list[tuple[str, list[tuple[str, str]]]]:
+    """Grouped ``(group_title, [(field_name, comment), ...])`` for MotorDesign.
+
+    The inline comments in ``design.py`` are the source of truth for what each
+    field means, so this parses the class source: ``# --- group ---`` headers
+    start a group, a field's trailing ``# comment`` documents it, and deeper-
+    indented comment-only lines continue the previous field's comment.
+    Standalone 4-space comments become sub-notes within the group.
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(MotorDesign)
+    groups: list[tuple[str, list[tuple[str, str]]]] = []
+    cur: list[tuple[str, str]] = []
+    title = "fields"
+    last_field: int | None = None                    # index into cur
+
+    field_re = re.compile(r"^    (\w+)\s*:\s*[^=]+=\s*(.+)$")
+    group_re = re.compile(r"^\s*#\s*-{2,}\s*(.+?)\s*-{2,}\s*$")
+    note_re = re.compile(r"^    #\s?(.*)$")
+    cont_re = re.compile(r"^\s{5,}#\s?(.*)$")
+
+    for line in src.splitlines():
+        if line.lstrip().startswith("def "):
+            break                                    # end of the field block
+        m = group_re.match(line)
+        if m:
+            if cur:
+                groups.append((title, cur))
+            title, cur, last_field = m.group(1), [], None
+            continue
+        m = field_re.match(line)
+        if m:
+            name, rest = m.group(1), m.group(2)
+            comment = rest.partition("#")[2].strip()
+            cur.append((name, comment))
+            last_field = len(cur) - 1
+            continue
+        m = cont_re.match(line)
+        if m and last_field is not None:
+            name, comment = cur[last_field]
+            cur[last_field] = (name, (comment + " " + m.group(1).strip()).strip())
+            continue
+        m = note_re.match(line)
+        if m and m.group(1).strip():
+            cur.append(("", m.group(1).strip()))     # sub-note within the group
+            last_field = None
+    if cur:
+        groups.append((title, cur))
+    return groups
+
+
+def _print_fields() -> None:
+    """``pcb-motor fields``: every settable field, grouped, with defaults."""
+    defaults = {f.name: getattr(MotorDesign(), f.name)
+                for f in dataclasses.fields(MotorDesign)}
+    print("MotorDesign fields -- settable with --set name=value "
+          "(SI units unless the comment says otherwise)")
+    for title, entries in _field_docs():
+        print(f"\n{title}")
+        for name, comment in entries:
+            if not name:                             # group sub-note
+                print(f"  -- {comment}")
+                continue
+            dflt = defaults.get(name, "?")
+            dflt_s = repr(dflt) if isinstance(dflt, str) else f"{dflt:g}" \
+                if isinstance(dflt, float) else str(dflt)
+            line = f"  {name:22s} = {dflt_s:<14s}"
+            print(f"{line} {comment}".rstrip())
 
 
 def _design_for(args):
@@ -174,6 +251,27 @@ def main(argv=None) -> int:
     pf.add_argument("--set", action="append", default=[], dest="sets",
                     help="set a MotorDesign field, e.g. --set pole_pairs=7 --set n_slots=12")
     pf.add_argument("--root", default="designs")
+
+    sub.add_parser("fields",
+                   help="list every settable MotorDesign field with default and meaning")
+
+    pfp = sub.add_parser(
+        "footprint",
+        help="build the production two-sided filled-copper stator footprint "
+             "(net-bearing pads, verified clearances) into the session dir")
+    pfp.add_argument("--session", required=True,
+                     help="session under designs/<name>/ to build the footprint for")
+    pfp.add_argument("--set", action="append", default=[], dest="sets",
+                     help="override a MotorDesign field for this build only")
+    pfp.add_argument("--single-tooth", action="store_true",
+                     help="emit only the base coil (tooth 0) instead of the full stator")
+    pfp.add_argument("--project", action="store_true",
+                     help="also generate the KiCad project (stator symbol + WYE "
+                          "schematic + library tables) into designs/<name>/kicad/")
+    pfp.add_argument("--resolution-mm", type=float, default=0.2,
+                     help="artwork buffering resolution [mm]; coarser = faster "
+                          "(default 0.2, production quality)")
+    pfp.add_argument("--root", default="designs")
 
     pr = sub.add_parser("report", help="write a combined HTML design report")
     pr.add_argument("--set", action="append", default=[], dest="sets")
@@ -279,7 +377,69 @@ def main(argv=None) -> int:
         s = sessions.Session(args.session, root=args.root)
         s.save_motor(design)
         print(f"session saved to {s.dir}")
+        if not s.requirements_yaml.exists():
+            s.save_requirements(sessions.requirements_skeleton(args.session))
+            print(f"requirements skeleton written to {s.requirements_yaml} "
+                  "-- fill in your targets (torque, speed, voltage, envelope, duty)")
         _print_point(design)
+        return 0
+
+    if args.cmd == "fields":
+        _print_fields()
+        return 0
+
+    if args.cmd == "footprint":
+        from . import session as sessions
+        from .kicad import FootprintError, build_footprint
+
+        s = sessions.Session(args.session, root=args.root)
+        if not s.exists():
+            raise SystemExit(
+                f"session {args.session!r} has no saved motor; "
+                f"run 'pcb-motor new --session {args.session}' first"
+            )
+        design = _apply_overrides(s.load_motor(), args.sets)
+        fname = ("stator_single_2side.kicad_mod" if args.single_tooth
+                 else "stator_full_2side.kicad_mod")
+        out = s.dir / fname
+        try:
+            rep = build_footprint(design, str(out),
+                                  single_tooth=args.single_tooth,
+                                  resolution_m=args.resolution_mm * 1e-3)
+        except FootprintError as exc:
+            print(f"FOOTPRINT FAILED: {exc}", file=sys.stderr)
+            return 2
+        print(f"footprint written to {out}")
+        print(f"  result           {'PASS' if rep.passed else 'FAIL'}")
+        print(f"  worst clearance  {rep.worst_clearance_mm:.3f} mm "
+              f"(need >= {rep.clearance_needed_mm:.3f} mm)")
+        print(f"  coils            {rep.n_coils} x {rep.turns_per_coil} turns")
+        print(f"  pads             {len(rep.pad_names)} "
+              f"({rep.pad_names[0]} .. {rep.pad_names[-1]})")
+        print(f"  bridges          {rep.n_bridges}")
+        print(f"  vias per coil    {rep.n_vias_per_coil} "
+              f"(stitch track {rep.conn_track_w_mm:.2f} mm)")
+        for n in rep.notes:
+            print(f"  note: {n}")
+        if args.project:
+            from .kicad import build_kicad_project
+            from .kicad.project import ProjectError
+
+            kdir = s.dir / "kicad"
+            try:
+                prep = build_kicad_project(
+                    design, str(kdir),
+                    footprint_full=None if args.single_tooth else str(out),
+                    footprint_single=str(out) if args.single_tooth else None,
+                )
+            except ProjectError as exc:
+                print(f"KICAD PROJECT FAILED: {exc}", file=sys.stderr)
+                return 2
+            import os
+            names = ", ".join(os.path.relpath(f, str(kdir)) for f in prep.files)
+            print(f"KiCad project written to {kdir} "
+                  f"({'PASS' if prep.passed else 'FAIL'}, "
+                  f"{len(prep.files)} files: {names})")
         return 0
 
     if args.cmd == "report":

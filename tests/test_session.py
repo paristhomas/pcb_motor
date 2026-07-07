@@ -58,6 +58,45 @@ def test_compare_one_column_per_design():
     assert any(row.startswith("| Continuous acceleration") for row in lines)
 
 
+def _coarse(**kw) -> MotorDesign:
+    """Coarse-but-real design so datasheet tests evaluate fast."""
+    return MotorDesign(coil_resolution_m=2e-3, commutation_steps=4, **kw)
+
+
+def test_datasheet_ripple_gate_line_with_drive_context():
+    """The choke/ripple rows must carry v_bus / f_pwm / ripple_frac and an
+    explicit PASS/FAIL gate verdict (they are uninterpretable without them)."""
+    sheet = datasheet(_coarse())
+    # drive context on the ripple row (defaults: 12 V, 24 kHz, 30 %)
+    assert "| PWM ripple (bare winding) |" in sheet
+    assert "12 V bus" in sheet
+    assert "24 kHz PWM" in sheet
+    assert "budget 30% of I_cont" in sheet
+    # explicit gate verdict: the default design fails, with the remedy inline
+    assert "| PWM ripple gate | FAIL (" in sheet
+    assert "uH/phase" in sheet
+    # turns label is unified
+    assert "| Turns / phase / layer-set |" in sheet
+    assert "| Turns / phase |" not in sheet
+
+
+def test_datasheet_ripple_gate_pass_branch():
+    sheet = datasheet(_coarse(drive_ripple_frac=50.0))
+    assert "| PWM ripple gate | PASS (" in sheet
+
+
+def test_datasheet_round_topology_has_no_coverage_line():
+    """pole_coverage is arc-only (round rotors ignore it in both the field and
+    the inertia models), so the round datasheet must not print a coverage
+    figure -- it shows the disc/ring geometry instead."""
+    sheet = datasheet(_coarse(magnet_topology="round"))
+    assert "coverage" not in sheet
+    assert "discs" in sheet            # e.g. "D15 discs @ r=37.2 mm"
+    # the arc sheet keeps the coverage figure
+    arc = datasheet(_coarse())
+    assert "85% coverage" in arc
+
+
 def test_compare_by_session_name(tmp_path):
     sa = Session("a", root=tmp_path)
     sa.save_motor(MotorDesign(magnet_grade="N42"))

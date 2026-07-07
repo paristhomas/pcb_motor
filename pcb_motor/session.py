@@ -22,6 +22,25 @@ from .evaluate import evaluate_design
 
 DEFAULT_ROOT = "designs"
 
+REQUIREMENTS_SKELETON = """\
+# Requirements for design session '{name}'.
+# Fill in your targets and constraints; delete keys that do not apply.
+# Free-form YAML: the file lives beside motor.json so the requirements and the
+# design evolve together (Stage 1 of the design guide).
+
+torque_mNm:            # continuous torque target [mNm]
+speed_rev_s:           # operating speed [rev/s]
+voltage_V:             # DC bus voltage available [V] (also set drive_v_bus)
+envelope_od_mm:        # max stator outer diameter [mm]
+envelope_axial_mm:     # max axial stack height [mm]
+duty:                  # thermal context, e.g. "continuous" or "30% for 10 s bursts"
+"""
+
+
+def requirements_skeleton(name: str) -> str:
+    """A commented requirements.yaml starter for a new session."""
+    return REQUIREMENTS_SKELETON.format(name=name)
+
 
 # --------------------------------------------------------------------------- #
 # Session: a named design on disk
@@ -122,6 +141,40 @@ def _trace_row(design: MotorDesign) -> str:
     return f"{design.trace_width_m*1e3:.3f} / {ts_mm:.3f} mm"
 
 
+def _magnet_row(design: MotorDesign) -> str:
+    """Magnet cell. ``pole_coverage`` is an arc-rotor parameter only (round
+    disc rotors ignore it entirely, in both the field and the inertia models),
+    so round topologies show the disc/ring geometry instead of a coverage
+    figure that has no effect."""
+    from .magnets import is_round
+
+    head = (f"{design.magnet_grade}, {design.magnet_topology}, "
+            f"{design.pole_pairs} pole-pairs, {design.magnet_thickness_m*1e3:.1f} mm")
+    if is_round(design.magnet_topology):
+        from .magnets import active_rings
+
+        rings = ", ".join(
+            f"D{disc_d*1e3:g} discs @ r={ring_r*1e3:g} mm"
+            for ring_r, disc_d in active_rings(design.rotor())
+        )
+        return f"{head}, {rings}"
+    return f"{head}, {design.pole_coverage*100:.0f}% coverage"
+
+
+def _ripple_gate_row(design: MotorDesign, r: dict) -> tuple[str, str]:
+    """Explicit PASS/FAIL for the PWM-ripple (choke) gate -- design guide
+    Stage 5. PASS means bare-winding worst-case ripple fits the budget."""
+    budget = design.drive_ripple_frac * r["i_cont_A"]
+    ripple = r["pwm_ripple_A_pp"]
+    if ripple <= budget:
+        verdict = (f"PASS ({_fmt(ripple)} A pp <= {_fmt(budget)} A budget)")
+    else:
+        verdict = (f"FAIL ({_fmt(ripple)} A pp > {_fmt(budget)} A budget, "
+                   f"{ripple/budget:.0f}x -- needs ~{_fmt(r['l_ext_uH'])} uH/phase "
+                   "external L)")
+    return ("PWM ripple gate", verdict)
+
+
 def headline_rows(design: MotorDesign, results: dict) -> list[tuple[str, str]]:
     """The (label, value) rows shown for a single design.
 
@@ -134,9 +187,7 @@ def headline_rows(design: MotorDesign, results: dict) -> list[tuple[str, str]]:
         # architecture / magnet
         ("Winding", f"{design.winding_topology}, {design.n_slots}N{n_poles}P, "
                     f"{design.n_phases}-phase, {design.parallel_paths} parallel path(s)"),
-        ("Magnets", f"{design.magnet_grade}, {design.magnet_topology}, "
-                    f"{design.pole_pairs} pole-pairs, {design.magnet_thickness_m*1e3:.1f} mm, "
-                    f"{design.pole_coverage*100:.0f}% coverage"),
+        ("Magnets", _magnet_row(design)),
         ("Stators", f"{design.n_stators} x {design.copper_layers}-layer, "
                     f"{design.board_thickness_m*1e3:.2f} mm FR4, "
                     f"{design.copper_weight_oz:g} oz Cu"),
@@ -148,15 +199,19 @@ def headline_rows(design: MotorDesign, results: dict) -> list[tuple[str, str]]:
         ("Kt (torque constant)", f"{_fmt(r['kt_mNm_per_A'])} mNm/A"),
         ("Phase resistance @20C", f"{_fmt(r['r_phase_20c_ohm'])} ohm"),
         ("Mean / peak airgap |Bz|", f"{_fmt(r['b_gap_mean_T'])} / {_fmt(r['b_gap_peak_T'])} T"),
-        ("Turns / phase", f"{r['n_turns']}"),
+        ("Turns / phase / layer-set", f"{r['n_turns']}"),
         ("Winding factor kw1", f"{_fmt(r['winding_factor'], 3)}"),
         # thermal / continuous rating
         ("Continuous current", f"{_fmt(r['i_cont_A'])} A"),
         ("Continuous torque", f"{_fmt(r['tau_cont_mNm'])} mNm"),
         ("Drive voltage (cont)", f"{_fmt(r['v_drive_cont_V'])} V"),
         ("Phase inductance (air-core)", f"{_fmt(r['l_phase_uH'])} uH"),
-        ("Ext. choke for ripple budget", f"{_fmt(r['l_ext_uH'])} uH"
-         f" @ {_fmt(r['pwm_ripple_A_pp'])} A pp bare"),
+        ("PWM ripple (bare winding)",
+         f"{_fmt(r['pwm_ripple_A_pp'])} A pp worst-case @ "
+         f"{design.drive_v_bus:g} V bus, {design.drive_f_pwm_hz/1e3:g} kHz PWM "
+         f"(budget {design.drive_ripple_frac:.0%} of I_cont)"),
+        _ripple_gate_row(design, r),
+        ("Ext. choke for ripple budget", f"{_fmt(r['l_ext_uH'])} uH"),
         ("Current density", f"{_fmt(r['current_density_A_mm2'])} A/mm^2"),
         ("Airgap shear", f"{_fmt(r['shear_stress_kPa'])} kPa"),
         # mechanical

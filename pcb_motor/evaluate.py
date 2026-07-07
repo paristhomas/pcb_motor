@@ -23,6 +23,11 @@ from .torque import kt_and_torque
 from .thermal import continuous_current
 from .inertia import rotor_inertia, total_inertia
 
+# Neck ("hot spot") current-density nudge threshold [A/mm^2]. Reported density
+# is at the winding's narrowest cross-section, so exceeding this means a local
+# hot spot even when the lumped thermal balance is satisfied.
+NECK_DENSITY_LIMIT_A_MM2 = 80.0
+
 
 def evaluate_design(design: MotorDesign) -> dict:
     """Evaluate one design point. Returns the full result-variable dict."""
@@ -83,6 +88,34 @@ def evaluate_design(design: MotorDesign) -> dict:
     f_plate = plate_axial_force(design) if design.back_iron else 0.0
 
     warnings = list(therm.get("warnings", []))
+
+    # PWM-ripple gate (design guide Stage 5): a coreless winding's air-core L
+    # is tiny, so worst-case ripple can dwarf the continuous current. Flag it
+    # loudly instead of returning a silently un-drivable design.
+    ripple_pp = ripple["pwm_ripple_a_pp"]
+    ripple_budget = design.drive_ripple_frac * i_cont
+    if math.isfinite(ripple_pp) and ripple_budget > 0 and ripple_pp > ripple_budget:
+        warnings.append(
+            f"PWM ripple {ripple_pp:.2f} A pp exceeds the {ripple_budget:.2f} A "
+            f"budget ({ripple_pp / ripple_budget:.0f}x) at "
+            f"{design.drive_v_bus:g} V bus / {design.drive_f_pwm_hz / 1e3:g} kHz "
+            f"/ {design.drive_ripple_frac:.0%} of I_cont: not drivable without "
+            f"~{ripple['l_ext_h'] * 1e6:.0f} uH/phase external inductance -- "
+            "see design guide Stage 5."
+        )
+
+    # Hot-neck nudge: current density is reported at the narrowest section
+    # (the neck at r_inner for tapered traces); IPC/JLC guidance puts sustained
+    # PCB current density around 20-35 A/mm^2, so ~80 is well into local-hot-
+    # spot territory even when the lumped thermal balance says OK.
+    if cur_density > NECK_DENSITY_LIMIT_A_MM2:
+        warnings.append(
+            f"current density {cur_density:.0f} A/mm^2 at the winding's "
+            f"narrowest section exceeds ~{NECK_DENSITY_LIMIT_A_MM2:.0f} A/mm^2: "
+            "expect a hot neck at r_inner -- widen trace_width_m, add copper "
+            "weight, or move r_inner_m outward."
+        )
+
     if design.rotor_sides == 2:
         warnings.append(
             "dual-rotor sandwich: the rotor-rotor axial attraction is NOT "

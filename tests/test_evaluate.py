@@ -37,3 +37,41 @@ def test_stronger_magnet_raises_continuous_acceleration():
     weak = evaluate_design(MotorDesign(magnet_grade="N35"))
     strong = evaluate_design(MotorDesign(magnet_grade="N52"))
     assert strong["accel_cont_rad_s2"] > weak["accel_cont_rad_s2"]
+
+
+def _coarse(**kw) -> MotorDesign:
+    """Coarse-but-real design for warning-path tests (fast evaluation)."""
+    return MotorDesign(coil_resolution_m=2e-3, commutation_steps=4, **kw)
+
+
+def test_pwm_ripple_gate_warning_when_over_budget():
+    """The ripple gate: an un-drivable winding must WARN, not return silently."""
+    r = evaluate_design(_coarse())
+    budget = 0.3 * r["i_cont_A"]                 # drive_ripple_frac default
+    assert r["pwm_ripple_A_pp"] > budget         # default design fails the gate
+    ws = [w for w in r["warnings"] if "PWM ripple" in w]
+    assert len(ws) == 1
+    w = ws[0]
+    # The warning carries the actual numbers + drive context + the remedy.
+    assert f"{r['pwm_ripple_A_pp']:.2f} A pp" in w
+    assert f"{budget:.2f} A" in w
+    assert f"{r['pwm_ripple_A_pp'] / budget:.0f}x" in w
+    assert "12 V bus" in w and "24 kHz" in w
+    assert f"~{r['l_ext_uH']:.0f} uH/phase" in w
+    assert "Stage 5" in w
+
+
+def test_no_pwm_ripple_warning_within_budget():
+    # A huge ripple budget makes the same design pass the gate: no warning.
+    r = evaluate_design(_coarse(drive_ripple_frac=50.0))
+    assert not [w for w in r["warnings"] if "PWM ripple" in w]
+
+
+def test_hot_neck_current_density_warning():
+    hot = evaluate_design(_coarse(h_conv=200.0))   # forces I_cont (and J) way up
+    assert hot["current_density_A_mm2"] > 80.0
+    assert any("hot neck" in w for w in hot["warnings"])
+
+    base = evaluate_design(_coarse())              # ~60 A/mm^2: below the nudge
+    assert base["current_density_A_mm2"] < 80.0
+    assert not any("hot neck" in w for w in base["warnings"])

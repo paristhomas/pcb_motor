@@ -95,15 +95,20 @@ def test_plot_motor_config():
     plt.close(fig)
 
 
-def test_plot_b_field_placeholder():
-    """Default path is the fast synthetic placeholder (no field/magnets needed).
-
-    The real Biot-Savart field is correct but far too slow for a unit test
-    (seconds per grid point), so it is opt-in via ``use_real_field=True`` and
-    deliberately not exercised here.
-    """
-    fig = plot_b_field(MotorDesign(), n_grid=12)
+def test_plot_b_field_default_is_real_biot_savart():
+    """The default is the REAL Biot-Savart B_z (the vectorised kernel makes it
+    cheap -- ~1.5 s at the default 48x48; a small grid keeps the test fast)."""
+    fig = plot_b_field(MotorDesign(), n_grid=10)
     _assert_valid_figure(fig)
+    assert "Biot-Savart" in fig.axes[0].get_title()
+    plt.close(fig)
+
+
+def test_plot_b_field_synthetic_placeholder_is_opt_in():
+    """The old synthetic pole-pattern sketch stays available behind the flag."""
+    fig = plot_b_field(MotorDesign(), n_grid=12, use_real_field=False)
+    _assert_valid_figure(fig)
+    assert "placeholder" in fig.axes[0].get_title()
     plt.close(fig)
 
 

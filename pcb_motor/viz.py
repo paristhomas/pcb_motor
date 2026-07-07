@@ -247,22 +247,22 @@ def plot_setup(design: MotorDesign, geo: CoilGeometry | None = None
 
 def plot_b_field(
     design: MotorDesign,
-    n_grid: int = 40,
-    use_real_field: bool = False,
+    n_grid: int = 48,
+    use_real_field: bool = True,
 ) -> "matplotlib.figure.Figure":
     """Filled contour of B_z over the stator plane.
 
-    By default this draws a smooth *synthetic placeholder* field over the magnet
-    annulus -- fast and deterministic, good enough to show the pole pattern.
+    By default this computes the REAL B_z from the rotor magnets (Amperian
+    loops via ``magnets.magnet_segments`` + the vectorised Biot-Savart kernel
+    ``field.b_field_at_points``, with iron images when ``back_iron`` is set).
+    The kernel is vectorised over grid points, so this is cheap: the default
+    48x48 grid takes ~1.5 s -- fine for reports and one-off figures, though
+    still not something to put inside a sweep's inner loop.
 
-    Set ``use_real_field=True`` to compute the true B_z from the rotor magnets
-    via ``magnets.magnet_segments`` + ``field.b_field_at_points``. That path is
-    physically accurate but VERY slow: the vendored Biot-Savart kernel evaluates
-    each grid point in a pure-Python loop with Richardson extrapolation, so cost
-    is roughly ``O(n_grid**2 * source_segments)`` -- seconds *per point*. Keep
-    ``n_grid`` small (<= ~16) when enabling it, and treat it as an expensive
-    one-off artifact, not something to run in a sweep or test loop. If either
-    module fails to import we silently fall back to the placeholder.
+    Set ``use_real_field=False`` for the old *synthetic placeholder*: a smooth
+    ``cos(p*phi)`` pattern over the magnet annulus in arbitrary units --
+    instant and deterministic, good enough to sketch the pole pattern (e.g. in
+    tests), but NOT physical.
     """
     rotor = design.rotor()
     r_out = rotor.magnet_r_outer_m
@@ -273,26 +273,21 @@ def plot_b_field(
     ys = np.linspace(-lim, lim, n_grid)
     xx, yy = np.meshgrid(xs, ys)
 
-    use_real = False
-    if use_real_field:
-        try:
-            from .field import b_field_at_points
-            from .magnets import magnet_segments
+    use_real = bool(use_real_field)
+    if use_real:
+        from .field import b_field_at_points
+        from .iron import with_iron_images
+        from .magnets import magnet_segments
 
-            # Visualisation only: a coarse magnet discretisation and field
-            # resolution keep this from being even slower. Accuracy here is for
-            # a readable contour, not torque.
-            from .iron import with_iron_images
-            source = with_iron_images(magnet_segments(rotor, n_arc=8), rotor)
-            pts = np.column_stack(
-                [xx.ravel(), yy.ravel(), np.full(xx.size, z_plane)]
-            )
-            b = b_field_at_points(source, pts, resolution_m=2.0e-3)
-            bz = b[:, 2].reshape(xx.shape)
-            use_real = True
-        except ImportError:
-            # TODO: wire real field once field.py/magnets.py land
-            pass
+        # Visualisation only: a coarse magnet discretisation and field
+        # resolution keep this quick. Accuracy here is for a readable
+        # contour, not torque.
+        source = with_iron_images(magnet_segments(rotor, n_arc=8), rotor)
+        pts = np.column_stack(
+            [xx.ravel(), yy.ravel(), np.full(xx.size, z_plane)]
+        )
+        b = b_field_at_points(source, pts, resolution_m=2.0e-3)
+        bz = b[:, 2].reshape(xx.shape)
 
     if not use_real:
         phi = np.arctan2(yy, xx)

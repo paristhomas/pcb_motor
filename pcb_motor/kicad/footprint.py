@@ -51,6 +51,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -366,11 +367,22 @@ class _StatorArtwork:
         # The filled-copper footprint IS the tapered-wedge artwork: widths grow
         # with radius so clearance holds at trace_space everywhere. A design
         # with tapered_traces=False is coerced (trace_width_m = width at
-        # r_inner_m), matching what the optimiser evaluates for this artwork.
+        # r_inner_m) -- LOUDLY, because the emitted copper then differs from
+        # what was simulated (turn count, resistance, Kt).
+        self.notes: list[str] = []
         if not getattr(design, "tapered_traces", False):
             design = dataclasses.replace(design, tapered_traces=True)
+            msg = (
+                "design has tapered_traces=false but this footprint is ALWAYS "
+                "the tapered-wedge artwork: turns/phase, resistance and Kt of "
+                "the emitted copper differ from what was simulated -- "
+                "re-evaluate with tapered_traces=true (e.g. pcb-motor point "
+                "--set tapered_traces=true) before trusting the simulated "
+                "numbers for this artwork"
+            )
+            self.notes.append("tapered_traces coerced to true: " + msg)
+            print("WARNING: " + msg, file=sys.stderr)
         self.D = design
-        self.notes: list[str] = []
         if not bool(getattr(design, "tapered_traces", False)):
             raise ValueError("tapered_traces coercion failed")
 
@@ -415,13 +427,18 @@ class _StatorArtwork:
             lim = 2.0 * (cP["ro"] - w_prev / 2.0 - ts - tipx)
         else:
             lim = np.inf
-        need = VIA_PAD - min(self.conn_w_cap, lim)
+        corr = min(self.conn_w_cap, lim)
+        need = VIA_PAD - corr
         if need > self.wshrink:
             if need > 0.05e-3:
                 raise FootprintError(
-                    f"stitch track ({min(self.conn_w_cap, lim)*1e3:.3f} mm) far "
-                    f"too narrow for a {VIA_PAD*1e3:.2f} mm via pad; coil turns "
-                    "too tightly packed at the stitch"
+                    f"stitch track far too narrow: the corridor between the "
+                    f"innermost turns allows a {corr*1e3:.3f} mm track, but the "
+                    f"{VIA_PAD*1e3:.2f} mm stitch-via pad needs >= "
+                    f"{(VIA_PAD - 0.05e-3)*1e3:.2f} mm (coil turns too tightly "
+                    "packed at the coil axis). Increase trace_width_m, "
+                    "trace_space_m or r_inner_m -- fewer/looser turns leave "
+                    "more room for the F<->B stitch."
                 )
             self.wshrink = need + 2e-6
             self.notes.append(
@@ -502,7 +519,10 @@ class _StatorArtwork:
         if VIA_PAD - conn_w > self.wshrink + 1e-9:
             raise FootprintError(
                 f"stitch track width {conn_w*1e3:.3f} mm cannot carry a "
-                f"{VIA_PAD*1e3:.2f} mm via pad; coil turns too tightly packed"
+                f"{VIA_PAD*1e3:.2f} mm via pad (needs >= "
+                f"{(VIA_PAD - self.wshrink)*1e3:.3f} mm): coil turns too "
+                "tightly packed. Increase trace_width_m, trace_space_m or "
+                "r_inner_m to open the corridor at the coil axis."
             )
 
         # Radial-line clearances below use the exact point-to-line distance
@@ -549,7 +569,13 @@ class _StatorArtwork:
                 break
         if n_rows == 0:
             raise FootprintError(
-                "no stitch via fits between the innermost radials on both layers"
+                f"no stitch via fits between the innermost radials on both "
+                f"layers: the {conn_w*1e3:.3f} mm track spans y "
+                f"[{bot_min*1e3:.3f}, {conn_top*1e3:.3f}] mm but one "
+                f"{VIA_PAD*1e3:.2f} mm via pad needs "
+                f"{(VIA_PAD + 2*0.05e-3)*1e3:.2f} mm of covered track on BOTH "
+                "layers. Increase trace_width_m, trace_space_m or r_inner_m "
+                "so the innermost turns leave more room at the coil axis."
             )
         dy_max = (n_rows - 1) / 2.0 * VIA_ROW_PITCH
         cover = dy_max + VIA_PAD / 2.0 + margin

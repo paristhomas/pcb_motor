@@ -70,12 +70,15 @@ bore, axial); duty (continuous vs burst); and **fixed stock** — magnet
 sizes/grades the user can source, board-house copper weight and min trace/space.
 Stock and fab limits are the user's fixed inputs, never optimizer knobs: confirm
 them, don't assume them. Write the agreed spec to
-`designs/<name>/requirements.yaml`. If the user genuinely doesn't care about a
-dimension, pick a sane default, state it, move on.
+`designs/<name>/requirements.yaml` (`pcb-motor new` seeds a commented skeleton
+with the torque/speed/voltage/envelope/duty keys if the file is missing). If the
+user genuinely doesn't care about a dimension, pick a sane default, state it,
+move on.
 
 ### Stage 1 — Seed a design that fits the envelope
 `pcb-motor new --session <name> --set r_outer_m=... --set pole_pairs=... --set n_slots=... [...]`
-(prints the first evaluation). Choose the annulus from the envelope, and a
+(prints the first evaluation; `pcb-motor fields` lists every settable field with
+default and meaning). Choose the annulus from the envelope, and a
 **verified slot/pole combo**:
 
 - **12N14P** (`n_slots=12, pole_pairs=7`) — the small-motor default, kw1≈0.94.
@@ -141,7 +144,11 @@ Markdown datasheet.
 - Quick artwork (centerline fp_line, not net-aware):
   `pcb-motor export --session <name> --single-coil --out designs/<name>/coil.kicad_mod`
   (drop `--single-coil` for the whole layer).
-- **Production artwork** — the Python API, not a CLI subcommand:
+- **Production artwork** — one command:
+  `pcb-motor footprint --session <name> [--single-tooth] [--project]` builds the
+  verified footprint into `designs/<name>/stator_full_2side.kicad_mod` and prints
+  the report summary; `--project` also generates the KiCad project in
+  `designs/<name>/kicad/`. Equivalent Python API when you want the report objects:
 
   ```python
   from pcb_motor.session import Session
