@@ -155,8 +155,10 @@ class RotorConfig:
     inner_disc_d_m: float = 8.0e-3     # round: inner-disc diameter (stock Ø8)
 
     def stator_z_m(self) -> float:
-        """Axial distance from the magnet mid-plane to the near stator copper
-        plane = air gap + half board thickness (rotor centred at z=0)."""
+        """Axial distance from the magnet mid-plane to the stator board
+        CENTRE = magnet half-thickness + air gap + half board thickness
+        (rotor centred at z=0). Copper layer positions come from
+        ``MotorDesign.layer_z_m`` and straddle this plane."""
         return self.magnet_thickness_m / 2 + self.air_gap_m + self.board_thickness_m / 2
 
 
@@ -251,3 +253,21 @@ class MotorDesign:
             inner_ring_r_m=self.inner_ring_r_m,
             inner_disc_d_m=self.inner_disc_d_m,
         )
+
+    def layer_z_m(self, layer: int) -> float:
+        """Axial position of copper layer ``layer`` (0-based, magnet mid-plane
+        at z=0).
+
+        Layers span the board symmetrically about its centre
+        (``rotor().stator_z_m()``): a 2-layer board puts copper on the two
+        faces at centre +/- t/2; a single layer sits at the centre. The old
+        convention (``centre + layer*t``) displaced the whole stack by t/2,
+        which skews Kt noticeably at high pole counts where the air-gap field
+        decays steeply with z.
+        """
+        z0 = self.rotor().stator_z_m()
+        n = int(self.copper_layers)
+        t = float(self.board_thickness_m)
+        if n <= 1:
+            return z0
+        return z0 - t / 2 + layer * t / (n - 1)

@@ -267,7 +267,7 @@ def export_spiral_polylines(design: MotorDesign, *, single_coil: bool = False,
     """
     n_slots = int(design.n_slots)
     sector = 2.0 * np.pi / n_slots
-    z = design.rotor().stator_z_m() + layer * float(design.board_thickness_m)
+    z = design.layer_z_m(layer)
     sectors = [0] if single_coil else range(n_slots)
     out = []
     for k in sectors:

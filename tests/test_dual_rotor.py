@@ -62,13 +62,11 @@ def test_kt_roughly_doubles():
     machine (fields add across the board).
 
     With ONE copper layer the coil sits exactly at the sandwich mirror plane
-    (z = stator_z), so by symmetry the ratio is exactly 2. With the default TWO
-    layers ``build_coil`` places the second layer at z0 + board_thickness --
-    beyond the mirror plane, closer to rotor B than layer 1 is to rotor A -- so
-    rotor B over-compensates that layer's weaker single-rotor field and the
-    machine ratio comes out ABOVE 2 (~2.3), not between 1.7 and 2. Both are
-    consequences of the same aligned-dipole field addition; a cancelling sign
-    error would give a ratio near 0 in either case.
+    (z = stator_z), so by symmetry the ratio is exactly 2. With TWO layers the
+    copper sits at stator_z +/- t/2 (``MotorDesign.layer_z_m``): the layer
+    nearer rotor A pairs with the layer nearer rotor B, so the machine ratio is
+    also exactly 2 by symmetry. A cancelling sign error would give a ratio near
+    0 in either case.
     """
     kt1 = kt_and_torque(MotorDesign(n_stators=1, copper_layers=1))["kt_nm_per_a"]
     kt2 = kt_and_torque(MotorDesign(n_stators=1, copper_layers=1,
@@ -79,7 +77,7 @@ def test_kt_roughly_doubles():
     kt1_2l = kt_and_torque(MotorDesign(n_stators=1))["kt_nm_per_a"]
     kt2_2l = kt_and_torque(MotorDesign(n_stators=1,
                                        rotor_sides=2))["kt_nm_per_a"]
-    assert 2.0 < kt2_2l / kt1_2l < 2.6
+    assert 1.95 < kt2_2l / kt1_2l < 2.05
 
 
 def test_rotor_inertia_doubles():

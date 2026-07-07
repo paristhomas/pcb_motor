@@ -48,9 +48,9 @@ radius); it is physically reasonable to ~the fill-factor level, not exact.
 
 Layers / stators
 ----------------
-Copper layers are stacked starting at the near stator copper plane
-``design.rotor().stator_z_m()`` and offset by ``board_thickness_m`` per
-additional layer (the inter-layer pitch on a PCB). For a dual-stator machine
+Copper layers span the board symmetrically about its centre
+``design.rotor().stator_z_m()`` (see ``MotorDesign.layer_z_m``): a 2-layer
+board puts copper on the two faces at centre +/- t/2. For a dual-stator machine
 (``n_stators == 2``) we model ONE stator's winding here and leave the second
 stator's identical contribution to be accounted for downstream (the torque layer
 can double it). This keeps ``build_coil`` focused on a single emitter of
@@ -208,8 +208,7 @@ def _build_radial_spoke(design: MotorDesign) -> CoilGeometry:
     radial_len = r_out - r_in
     n_rad_seg = max(1, int(np.ceil(radial_len / res)))
 
-    z0 = design.rotor().stator_z_m()
-    board_pitch = float(design.board_thickness_m)
+    # copper layers span the board symmetrically about its centre
 
     # Angular slot for each go/return pair. Each pair occupies 2 conductor slots
     # of width = pitch; place go and return one pitch apart, pairs spread evenly.
@@ -232,7 +231,7 @@ def _build_radial_spoke(design: MotorDesign) -> CoilGeometry:
     length_per_phase = 0.0
 
     for layer in range(n_layers):
-        z = z0 + layer * board_pitch
+        z = design.layer_z_m(layer)
         for t in range(turns_per_layer):
             phase = t % n_phases
             base_ang = t * pair_ang_step
@@ -332,8 +331,7 @@ def _build_spiral(design: MotorDesign) -> CoilGeometry:
     arc_len_est = total_angle * r_mean
     n_seg = max(8, int(np.ceil(arc_len_est / res)))
 
-    z0 = design.rotor().stator_z_m()
-    board_pitch = float(design.board_thickness_m)
+    # copper layers span the board symmetrically about its centre
 
     polylines: list[np.ndarray] = []
     mids_list: list[np.ndarray] = []
@@ -345,7 +343,7 @@ def _build_spiral(design: MotorDesign) -> CoilGeometry:
     length_per_phase = 0.0
 
     for layer in range(n_layers):
-        z = z0 + layer * board_pitch
+        z = design.layer_z_m(layer)
         for p in range(n_phases):
             phi0 = p * 2.0 * np.pi / n_phases
             angs = np.linspace(0.0, total_angle, n_seg + 1)
@@ -476,8 +474,7 @@ def _build_concentrated(design: MotorDesign) -> CoilGeometry:
     turns_per_coil = _count_turns(design)
 
     layout = _coil_layout(n_slots, n_phases)
-    z0 = design.rotor().stator_z_m()
-    board_pitch = float(design.board_thickness_m)
+    # copper layers span the board symmetrically about its centre
 
     tapered = bool(getattr(design, "tapered_traces", False))
     cond_thickness = _copper_thickness(float(design.copper_weight_oz))
@@ -489,7 +486,7 @@ def _build_concentrated(design: MotorDesign) -> CoilGeometry:
     copper_volume = 0.0        # all phases, one stator [m^3] (tapered)
 
     for layer in range(n_layers):
-        z = z0 + layer * board_pitch
+        z = design.layer_z_m(layer)
         for k in range(n_slots):
             center = k * sector
             phase, sign = layout[k]
@@ -614,12 +611,11 @@ def coil_current_source(design: MotorDesign, i_phase_amps):
     n_layers = int(design.copper_layers)
     sector = 2.0 * np.pi / n_slots
     layout = _coil_layout(n_slots, n_phases)
-    z0 = design.rotor().stator_z_m()
-    board_pitch = float(design.board_thickness_m)
+    # copper layers span the board symmetrically about its centre
 
     sources = []
     for layer in range(n_layers):
-        z = z0 + layer * board_pitch
+        z = design.layer_z_m(layer)
         for k in range(n_slots):
             phase, sign = layout[k]
             poly = coil_spiral_polyline(design, k * sector, z)
