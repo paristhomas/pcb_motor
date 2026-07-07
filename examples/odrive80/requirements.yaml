@@ -1,0 +1,27 @@
+application: flat pancake motor, ODrive-driven, NO external inductors/chokes if possible
+objective: maximize continuous torque at the thermal limit
+torque_cont_mNm: maximize          # no fixed target; report what the envelope gives
+speed_rpm: unspecified (assume low; pancake/direct-drive class)
+bus_voltage_V: 12-56 (ODrive range) — designer's choice, pick what makes no-choke closest
+drive: ODrive FOC; f_pwm 24 kHz stock (ODrive S1/Pro can run up to 48 kHz)
+drive_ripple_budget: repo default 30% of I_cont (drive_ripple_frac=0.3)
+envelope:
+  outer_diameter_mm: 80            # hard limit per PCB
+  bore_mm: unspecified
+  axial_mm: unspecified
+duty: continuous
+hard_constraints:
+  pole_pairs: 21                   # fixed by customer -> 36N42P verified combo (n_slots=36)
+  n_stators: 2                     # one PCB each side of a single rotor disk, in SERIES
+  copper_layers_per_pcb: 2
+  board_thickness_mm: 0.8
+  copper_weight_oz: 1.0            # -> JLC min trace/space 0.127 mm (5 mil)
+  back_iron: none anywhere
+  air_gap_mm: 1.0 per side (mechanical)
+stock:
+  magnets: off-the-shelf round disc magnets only (magnet_topology=round);
+           real sizes Ø3/Ø4/Ø5/Ø6 mm x 1-3 mm, N35-N52 (N52 assumed purchasable)
+  fab: JLCPCB 2-layer standard, 1 oz (5/5 mil min)
+open_questions:
+  - no-choke feasibility must be judged against the repo gate
+    ripple_pp = v_bus/(4*L*f_pwm) vs drive_ripple_frac * i_cont
