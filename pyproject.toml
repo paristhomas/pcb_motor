@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcb-motor"
+version = "0.1.0"
+description = "Design coreless axial-flux PCB motors end to end: physics, coil layout, and KiCad export"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Paris Thomas" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pyyaml",
+    "shapely",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+sweep = ["holobench"]
+
+[project.scripts]
+pcb-motor = "pcb_motor.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/paristhomas/pcb_motor"
+
+[tool.setuptools.packages.find]
+include = ["pcb_motor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
