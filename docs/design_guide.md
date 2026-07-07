@@ -98,6 +98,43 @@ The knobs, grouped. Defaults in parentheses.
 | `magnet_topology` | arc | `arc` = continuous pole-arc ring (custom arc segments). `round` = two concentric rings of off-the-shelf round disc magnets — the buy-it-today rotor (`outer_ring_r_m`, `outer_disc_d_m`, `inner_ring_r_m`, `inner_disc_d_m`). |
 | `carrier_thickness_m` | 1.5 mm | 3D-printed rotor carrier, counted in rotor inertia. |
 
+#### Round-disc rotors (`magnet_topology="round"`)
+
+The round rotor is built from **two concentric rings of stock disc magnets** — every
+pole is one outer disc plus one inner disc, same polarity, alternating pole to pole.
+Four fields describe it (defaults in parentheses):
+
+| Field | Default | What it does |
+|---|---|---|
+| `outer_ring_r_m` | 37.2 mm | Centre radius of the outer disc ring. |
+| `outer_disc_d_m` | 15 mm | Outer disc diameter (default fits stock Ø15). |
+| `inner_ring_r_m` | 20.6 mm | Centre radius of the inner disc ring. |
+| `inner_disc_d_m` | 8 mm | Inner disc diameter (default fits stock Ø8). |
+
+Worked example — the rotor of the committed [`examples/odrive80`](../examples/odrive80/README.md)
+design, 42× Ø5×3 mm N52 outer + 42× Ø4×3 mm N52 inner discs (42 poles = one disc
+pair per pole), tried here against our running session:
+
+```bash
+pcb-motor point --session pancake80 \
+  --set magnet_topology=round \
+  --set outer_ring_r_m=35e-3 --set outer_disc_d_m=5e-3 \
+  --set inner_ring_r_m=29e-3 --set inner_disc_d_m=4e-3
+```
+
+Two things to know before sweeping these:
+
+- **`pole_coverage`, `magnet_r_inner_m`, and `magnet_r_outer_m` are arc-topology
+  parameters — they have no effect in round mode.** The disc rings fully define the
+  round rotor's magnet geometry (the datasheet suppresses the coverage figure for
+  round rotors for the same reason). Don't waste sweep budget on them.
+- Single-ring study variants exist: `round_outer` (outer ring only) and
+  `round_inner` (inner ring only) — useful for asking what each ring buys.
+
+Sanity-check the geometry after choosing radii/diameters: adjacent discs on a ring
+must not overlap, and see the Stage 7 carrier-wall note before you fall in love with
+a packing the printer can't build.
+
 **Stack — how boards and rotor sandwich together:**
 
 | Field | Default | What it does |
@@ -180,6 +217,12 @@ saving it. The headline metrics, and what healthy looks like:
   examples land 45–75). Treat big jumps as a flag: with `tapered_traces` this reports
   the *narrowest* point (at `r_inner`), so a spike means a hot neck — widen
   `trace_width_m` or move `r_inner_m` out.
+- **`Phase resistance` / `Phase inductance`** — machine **totals for all `n_stators`
+  boards wired in series**: both scale exactly ×`n_stators`, so on the default
+  two-board machine each board contributes half of the printed R and L. Compare
+  against per-board bench measurements accordingly — and note the Stage 5 ripple
+  gate hinges on this total L, which is precisely why parallel-wiring the boards
+  (halving L) is forbidden.
 - **`PWM ripple @bus/fsw` and `Ext. L for ripple budget`** — the Stage 5 gate. Ripple
   bigger than the continuous current itself means your drive would mostly be making
   heat and acoustic art.
@@ -202,7 +245,10 @@ saving it. The headline metrics, and what healthy looks like:
 
 ### By hand (recommended first)
 
-`--set` on `point` is free; nothing is saved until you re-run `new`. Our seed's
+`--set` on `point` commits you to nothing — the change isn't saved until you re-run
+`new`. It isn't *instant*, though: every `point` is a real Biot–Savart solve, ~30–60 s
+of compute, so a hand-swept five-value comparison is a few-minute coffee, not a
+keystroke (the `[sweep]` extra parallelizes real sweeps — see below). Our seed's
 problem was torque, and its drive voltage (16.5 V of 24 V) said "the winding is
 thinner than it needs to be". Trade turns for copper: 2 oz foil, respaced to JLC's
 2 oz minimum (0.20 mm), tapered so the clearance holds at every radius:
@@ -249,6 +295,13 @@ pcb-motor new --session pancake80 \
 (±30%: measure before you celebrate). Note what we did *not* do: shrink `trace_space`
 below the fab minimum, or invent a magnet. Re-running `new` saved this as the session's
 design.
+
+One artifact to expect while iterating: the winder fits an **integer number of turns**
+into each tooth, so a fine `trace_width_m` (or `trace_space_m`) sweep moves in
+plateaus — Kt barely moves while the turn count holds, then steps when a turn is
+gained or lost, and can even wiggle non-monotonically by a percent or two at constant
+turn count as the spiral re-packs. That's quantization, not noise: watch the
+`Turns / phase / layer-set` line, and don't chase sub-plateau differences.
 
 ![The pancake80 winding](images/coil_layout.png)
 
@@ -333,6 +386,13 @@ the order you should consider them:
 4. **Higher switching frequency.** Linear again; 48 kHz vs 24 kHz halves ripple.
    Driver-dependent, and switching losses climb.
 
+A footnote that bites: **check what your driver actually switches at.** Stock
+ODrive v3.6 runs f_pwm = 24 kHz; ODrive Pro and S1 can be configured up to 48 kHz.
+`drive_f_pwm_hz` defaults to 24 kHz — copying an example that set 48 kHz (or the
+reverse) silently halves or doubles every ripple number in the report, and with it
+the choke spec. Set the frequency your hardware will really use before you believe
+the gate.
+
 And the dual-stator footnote that will save your build: the two boards **must be wired
 in series, never in parallel.** Series doubles phase inductance and shares the bus
 across both windings; parallel halves the inductance *and* leaves the full bus across
@@ -414,7 +474,13 @@ What `build_footprint` gives you beyond pretty spirals:
 `build_kicad_project` then writes a schematic where the whole motor is ONE symbol
 (pin numbers = pad names), the 3-phase WYE is pre-wired, and the three phase-chain
 ends come out as separate nets — precisely so two identical boards can be
-series-connected externally (star the three ends on one board only).
+series-connected externally (star the three ends on one board only). Note that the
+project **vendors a copy of the footprint** into its own library,
+`kicad/pcb_motor.pretty/coil_full_2side.kicad_mod` — always under that canonical
+name, regardless of what the source `.kicad_mod` was called. The schematic references
+the vendored copy, so the project directory is self-contained and you can move or
+rename the original footprint file freely; just remember which copy KiCad is actually
+reading if you regenerate one and not the other.
 
 Two practical notes from the trenches:
 
@@ -460,6 +526,13 @@ was compiled mid-2026.
 - Print a carrier with pockets ~0.1 mm over magnet size; magnets go in with CA glue,
   **alternating polarity** — mark polarity with a sharpie *before* gluing, and check
   each one against its neighbor (they'll tell you: repulsion is correct).
+- **Check the wall between adjacent pockets is printable.** The model knows fields,
+  not printers: it will cheerfully reward a disc packing that leaves 0.16 mm of
+  "wall" between round magnets. Practical minimums: **~0.8 mm for FDM**, **~0.3 mm
+  for resin**. If your best packing is tighter than that, leave the pockets
+  open-walled (merge them into a slot, or cut the inter-pocket wall away entirely) —
+  adjacent same-ring discs repel each other, and that repulsion holds each disc
+  against its pocket rim while the glue cures.
 - The dual-stator sandwich is friendly to assemble: there's no iron anywhere, so the
   magnet ring isn't yanked toward the boards — handling is easy. Keep steel tools and
   other magnets clear; the ring is still very much a magnet.

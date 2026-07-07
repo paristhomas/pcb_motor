@@ -90,11 +90,28 @@ default and meaning). Choose the annulus from the envelope, and a
   printed `Winding factor kw1` is ≥0.9; if not, say so and fix the combo before
   optimizing anything.
 
+If the user's magnet stock is off-the-shelf round discs (it usually is), set
+`magnet_topology=round` and describe the rotor with the four round fields:
+`outer_ring_r_m`/`outer_disc_d_m` (outer disc ring centre radius / disc diameter)
+and `inner_ring_r_m`/`inner_disc_d_m` (inner ring). Each pole is one outer + one
+inner disc, same polarity. In round mode `pole_coverage` / `magnet_r_inner_m` /
+`magnet_r_outer_m` are inert (arc-only) — don't sweep them. Check buildability:
+adjacent discs must not overlap, and the printed carrier needs a real wall between
+pockets (~0.8 mm FDM, ~0.3 mm resin — or open-walled pockets, where inter-disc
+repulsion holds each disc against its rim); the model will happily reward a 0.16 mm
+paper wall, so you must catch it.
+
 Read the headline metrics back against the user's targets — call out where it's
 short or over.
 
 ### Stage 2 — Iterate the coil toward the targets
-Explore with `point` (nothing saved), persist winners with `new`:
+Explore with `point` (nothing saved), persist winners with `new`. Budget honestly:
+each `point` run is a real Biot–Savart solve, ~30–60 s — a 5-value hand sweep is a
+few minutes, so tell the user before launching one (the `[sweep]` extra
+parallelizes proper sweeps). Expect turn-count quantization: the winder fits an
+integer number of turns, so fine `trace_width_m` sweeps show plateaus and small
+non-monotonic Kt wiggles at constant turn count — expected, not noise (watch
+`Turns / phase / layer-set`). The moves:
 - `pcb-motor point --session <name> --set trace_width_m=2e-4 [...]`
 - Key knobs: `trace_width_m`, `trace_space_m` (fab minimum, per copper weight!),
   `copper_weight_oz` (2 oz halves R, Kt unchanged — but JLC min space rises
@@ -112,7 +129,9 @@ Explore with `point` (nothing saved), persist winners with `new`:
 ### Stage 3 — The PWM-ripple / choke feasibility gate (always run it)
 Coreless windings have µH-class inductance; FOC drivers assume much more. Worst-case
 ripple is `v_bus / (4·L·f_pwm)` at 50% duty. Set the user's real `drive_v_bus` and
-`drive_f_pwm_hz` on the design, then read:
+`drive_f_pwm_hz` on the design — ask which driver: stock ODrive v3.6 switches at
+24 kHz, ODrive Pro/S1 up to 48 kHz, and the default is 24 kHz, so an inherited
+`drive_f_pwm_hz` silently halves/doubles every ripple number. Then read:
 - `PWM ripple @bus/fsw` vs the budget (`drive_ripple_frac` × I_cont, default 30%);
 - `Ext. L for ripple budget` (`l_ext_uH`) — the per-phase series choke that fixes it.
 
@@ -168,7 +187,10 @@ Markdown datasheet.
   narrow at `r_inner` — move `r_inner_m` outward and re-evaluate (a 36-slot design
   needed r_inner 16→18 mm). The output directory must exist.
   `build_kicad_project` writes the symbol lib, WYE-pre-wired schematic, and lib
-  tables; pin numbers equal footprint pad names by construction.
+  tables; pin numbers equal footprint pad names by construction. It vendors a COPY
+  of the footprint into `kicad/pcb_motor.pretty/coil_full_2side.kicad_mod` (always
+  that canonical name, whatever the source file was called) — the project reads the
+  vendored copy, so regenerate the project if you regenerate the footprint.
 
 ## Reading the headline metrics (for answering questions)
 
@@ -179,7 +201,9 @@ is the realistic coreless range; `r_phase_20c_ohm`; `current_density_A_mm2` sani
 flag (see Stage 4); `shear_stress_kPa` ~0.1–1 for coreless PCB; `winding_factor`
 ≥0.9 or the layout is wrong; `winding_utilisation` ~0.64–0.69 typical;
 `accel_cont_rad_s2` = τ_cont/J_total — set `load_inertia_kgm2` or it flatters;
-`l_phase_uH` + `pwm_ripple_A_pp` + `l_ext_uH` = the Stage 3 gate;
+`l_phase_uH` + `pwm_ripple_A_pp` + `l_ext_uH` = the Stage 3 gate — and note
+`r_phase_20c_ohm` and `l_phase_uH` are TOTALS for all `n_stators` boards in series
+(×`n_stators`; per-board bench values are 1/`n_stators` of these);
 `end_turn_fraction` lower is better (more slots helps at large OD). Surface any
 `warnings` the evaluator prints — they are real (e.g. the dual-rotor attraction
 warning must reach the user).

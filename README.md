@@ -52,6 +52,7 @@ saved motor plus everything you generate for it. Seed one from defaults (a 60 mm
 ```text
 $ pcb-motor new --session my-first-motor
 session saved to designs/my-first-motor
+requirements skeleton written to designs/my-first-motor/requirements.yaml -- fill in your targets (torque, speed, voltage, envelope, duty)
 pcb-motor point  [concentrated, 7pp, N42, 2 stator(s)]
 --------------------------------------------------------
   Continuous acceleration             583.1 rad/s^2
@@ -60,15 +61,31 @@ pcb-motor point  [concentrated, 7pp, N42, 2 stator(s)]
   Continuous current                 0.3175 A
   Mean airgap |Bz|                   0.1823 T
   ...
+  Turns / phase / layer-set              96
+  ...
   Phase inductance (air-core)         76.86 uH
   PWM ripple @bus/fsw                 1.626 A pp
   Ext. L for ripple budget             1235 uH
   ...
   Winding factor kw1                 0.9393
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+WARNINGS (1):
+  ! PWM ripple 1.63 A pp exceeds the 0.10 A budget (17x) at 12 V bus / 24 kHz / 30% of I_cont: not drivable without ~1235 uH/phase external inductance -- see design guide Stage 5.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ```
 
-Poke at it without committing to anything — `--set` overrides any `MotorDesign` field
-on top of the saved session:
+The skeleton `requirements.yaml` is for your torque/speed/voltage/envelope/duty
+targets, so the design and its requirements travel together. And yes — the default
+design greets you with a wall of exclamation marks. That's the no-choke feasibility
+gate doing its job (air-core PCB windings have tiny inductance; the design guide's
+Stage 5 is entirely about this). The tool would rather shout now than after you've
+ordered boards.
+
+Poke at the design without committing to anything — `--set` overrides any
+`MotorDesign` field on top of the saved session, and `pcb-motor fields` prints every
+settable field, grouped, with its default and meaning, so you never have to guess a
+name:
 
 ```text
 $ pcb-motor point --session my-first-motor --set trace_width_m=0.2e-3
@@ -93,14 +110,13 @@ KiCad footprint written to designs/my-first-motor/coil.kicad_mod (single coil: 1
 1557 fp_line segments, width 0.150 mm on F.Cu)
 ```
 
-Other subcommands: `fields` (every settable `MotorDesign` field, grouped, with
-defaults and meanings), `footprint` (the production two-sided filled-copper stator
-footprint, clearance-verified; `--project` adds the KiCad symbol/schematic project),
-`config` (setup figure), `compare` (sessions side by side),
-`sweep` / `optimize` (interactive dashboards and optuna, with the `[sweep]` extra).
-`new` also drops a commented `requirements.yaml` skeleton into the session dir —
-fill in your torque/speed/voltage/envelope/duty targets so the design and its
-requirements travel together.
+That `export` is the quick eyeball-it-in-KiCad artwork. When you're actually heading
+to a board house, `pcb-motor footprint --session <name>` builds the production
+two-sided filled-copper stator footprint — net-bearing terminal pads, via stitch,
+clearance-verified against JLC rules *before* it writes — and `--project` wraps it
+in a complete KiCad project with the WYE pre-wired. Rounding out the CLI: `config`
+(the setup figure), `compare` (sessions side by side), and `sweep` / `optimize`
+(interactive dashboards and optuna, with the `[sweep]` extra).
 
 Here's a 36-slot / 42-pole demo winding the engine generated, and the actual
 Biot–Savart field its rotor puts through the stator plane:
@@ -129,6 +145,18 @@ Biot–Savart field its rotor puts through the stator plane:
   inductance, so the tool reports worst-case PWM current ripple
   (`v_bus / (4·L·f_pwm)`) and the external inductance needed to hit your ripple
   budget. Most small PCB motors need that choke. Better to find out now.
+
+## A real worked example
+
+[`examples/odrive80/`](examples/odrive80/) is a complete design session, committed
+as-is: an 80 mm, 42-pole dual-stator pancake built entirely from off-the-shelf round
+disc magnets (42× Ø5 mm + 42× Ø4 mm N52), on two ordinary 2-layer 1 oz JLC boards.
+The tool's verdict: **Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at just under 1 A
+and 3 Ω** — and an honest one-liner the brief didn't want to hear: *driving it
+choke-free from an ODrive is infeasible by 32×; budget ~204 µH of external inductance
+per phase.* The directory has the requirements, the saved design, the datasheet, the
+clearance-verified footprint, the ready KiCad project, and a README telling the whole
+story — including the part where the tool says no.
 
 ## The physics, honestly
 

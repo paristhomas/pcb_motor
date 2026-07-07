@@ -118,7 +118,9 @@ falsify it in your favor or against.
 mutual terms between every segment pair, with a regularized kernel using the
 rectangular-conductor geometric mean distance `0.2235(w+t)` so the self-terms don't
 blow up. Air-core only; stated accuracy **±20%**, which is exactly enough for its one
-job: the choke question.
+job: the choke question. Like the reported phase resistance, the reported inductance
+is the **machine total — all `n_stators` boards in series** (×`n_stators`, ÷`parallel_paths²`);
+a per-board bench measurement should read 1/`n_stators` of it.
 
 **PWM ripple** is the worst-case (50% duty) triangle: `ripple_pp = v_bus/(4·L·f_pwm)`,
 compared against `drive_ripple_frac · I_cont`; the report includes the external series
