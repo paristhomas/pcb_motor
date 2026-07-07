@@ -123,8 +123,14 @@ def _draw_coil(ax, geo: CoilGeometry, one_layer: bool = True) -> None:
 
 
 def _draw_stack(ax, design: MotorDesign) -> None:
-    """Axial r-z cross-section: magnet rotor, stator PCBs (+copper layers),
-    back-iron, air gaps."""
+    """Axial r-z cross-section of the ACTUAL configuration: magnet rotor(s),
+    ``n_stators`` stator PCBs (+copper layers), back-iron, air gaps.
+
+    - ``n_stators == 2``: rotor at z=0, one board each side (the default).
+    - ``n_stators == 1``: rotor at z=0, one board on the +z side only.
+    - ``rotor_sides == 2``: dual-rotor sandwich -- the single board sits between
+      the z=0 rotor and a second magnet plane centred at ``2 * stator_z``.
+    """
     from matplotlib.patches import Rectangle
     ri = design.r_inner_m * 1e3
     ro = design.r_outer_m * 1e3
@@ -133,13 +139,18 @@ def _draw_stack(ax, design: MotorDesign) -> None:
     bd = design.board_thickness_m * 1e3
     iron = 0.5
 
+    z_min, z_max = 0.0, 0.0
+
     def band(z0, z1, col, label):
+        nonlocal z_min, z_max
         ax.add_patch(Rectangle((ri, z0), ro - ri, z1 - z0, facecolor=col,
                                edgecolor="k", lw=0.6))
         ax.text(ro + 1, 0.5 * (z0 + z1), label, va="center", fontsize=7)
+        z_min = min(z_min, z0, z1); z_max = max(z_max, z0, z1)
 
     band(-t / 2, t / 2, "#cf9bcf", "rotor magnet")
-    for sgn in (+1, -1):
+    sides = (+1, -1) if design.n_stators >= 2 else (+1,)
+    for sgn in sides:
         b0 = sgn * (t / 2 + gap); b1 = b0 + sgn * bd
         zlo, zhi = min(b0, b1), max(b0, b1)
         band(zlo, zhi, "#ffcc66", "stator PCB")
@@ -149,10 +160,22 @@ def _draw_stack(ax, design: MotorDesign) -> None:
         if design.back_iron:
             i0 = b1; i1 = i0 + sgn * iron
             band(min(i0, i1), max(i0, i1), "#888888", "back iron")
+    if design.rotor_sides == 2:
+        # Second magnet plane of the sandwich, centred at 2*stator_z.
+        zc2 = t + 2 * gap + bd            # = 2 * stator_z_m, in mm
+        band(zc2 - t / 2, zc2 + t / 2, "#cf9bcf", "rotor magnet (2nd)")
     ax.axhline(0, color="gray", lw=0.4, ls=":")
-    top = t / 2 + gap + bd + iron
-    ax.set_xlim(ri - 6, ro + 13); ax.set_ylim(-top * 1.4, top * 1.4)
+    pad = 0.4 * max(z_max - z_min, 1.0)
+    ax.set_xlim(ri - 6, ro + 13); ax.set_ylim(z_min - pad, z_max + pad)
     ax.set_xlabel("radius [mm]"); ax.set_ylabel("axial z [mm]")
+
+
+def _stack_desc(design: MotorDesign) -> str:
+    """Human description of the axial topology (correct singular/plural)."""
+    s = f"{design.n_stators} stator" + ("" if design.n_stators == 1 else "s")
+    if design.rotor_sides == 2:
+        s = "dual rotor, " + s
+    return s
 
 
 def _draw_magnets(ax, rotor: RotorConfig) -> None:
@@ -188,7 +211,7 @@ def plot_stack(design: MotorDesign) -> "matplotlib.figure.Figure":
     """Axial stack cross-section (r-z slice)."""
     fig, ax = plt.subplots(figsize=(6, 5))
     _draw_stack(ax, design)
-    ax.set_title(f"Axial stack: {design.n_stators} stators, gap "
+    ax.set_title(f"Axial stack: {_stack_desc(design)}, gap "
                  f"{design.air_gap_m*1e3:.1f}mm, {design.copper_layers} Cu/board")
     fig.tight_layout()
     return fig
@@ -215,7 +238,7 @@ def plot_setup(design: MotorDesign, geo: CoilGeometry | None = None
                       f"({rotor.pole_pairs}pp), {rotor.magnet_grade}")
 
     _draw_stack(axes[2], design)
-    axes[2].set_title(f"Axial stack: {design.n_stators} stators, gap "
+    axes[2].set_title(f"Axial stack: {_stack_desc(design)}, gap "
                       f"{design.air_gap_m*1e3:.1f}mm")
     fig.suptitle(f"{design.n_slots}N{n_poles}P  (winding factor kw1={kw:.3f})", fontsize=11)
     fig.tight_layout()

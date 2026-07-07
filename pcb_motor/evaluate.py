@@ -26,6 +26,12 @@ from .inertia import rotor_inertia, total_inertia
 
 def evaluate_design(design: MotorDesign) -> dict:
     """Evaluate one design point. Returns the full result-variable dict."""
+    # Fail fast on invalid topology combos (magnet_segments enforces the same
+    # rules; checking here avoids paying for the coil build first).
+    from .magnets import validate_rotor_sides
+
+    validate_rotor_sides(design.rotor())
+
     geo = build_coil(design)
 
     # Resistance: single-stator winding scaled to the series machine.
@@ -76,6 +82,15 @@ def evaluate_design(design: MotorDesign) -> dict:
 
     f_plate = plate_axial_force(design) if design.back_iron else 0.0
 
+    warnings = list(therm.get("warnings", []))
+    if design.rotor_sides == 2:
+        warnings.append(
+            "dual-rotor sandwich: the rotor-rotor axial attraction is NOT "
+            "modelled (plate_pull_N covers stator back iron only). The two "
+            "magnet plates pull toward each other through the board -- size "
+            "the rotor spacer/hub and assembly jig for that force."
+        )
+
     return {
         "accel_cont_rad_s2": a_cont,            # OBJECTIVE
         "tau_cont_mNm": tau_cont * 1e3,
@@ -102,8 +117,9 @@ def evaluate_design(design: MotorDesign) -> dict:
         "l_ext_uH": ripple["l_ext_h"] * 1e6,
         "eddy_loss_W_ref": p_eddy,
         "plate_pull_N": f_plate,
+        "rotor_sides": design.rotor_sides,
         "torque_ripple": tq["torque_ripple"],
         "winding_factor": tq.get("winding_factor", float("nan")),
         "winding_utilisation": tq.get("winding_utilisation", float("nan")),
-        "warnings": therm.get("warnings", []),
+        "warnings": warnings,
     }

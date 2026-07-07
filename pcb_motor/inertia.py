@@ -43,7 +43,11 @@ def rotor_inertia(rotor: RotorConfig) -> float:
     (they are FIXED), so back iron contributes ZERO rotor inertia.
     ``RotorConfig`` has no way to express rotor-bonded iron, so that term is 0
     here -- consistent with the validated default topology.
+
+    Dual-rotor sandwich (``rotor_sides == 2``): TWO identical magnet+carrier
+    discs spin together, so both terms double (x rotor_sides).
     """
+    sides = max(1, int(rotor.rotor_sides))
     t = rotor.magnet_thickness_m
 
     if is_round(rotor.magnet_topology):
@@ -66,7 +70,7 @@ def rotor_inertia(rotor: RotorConfig) -> float:
         r_extent = rotor.outer_ring_r_m + rotor.outer_disc_d_m / 2.0
         m_carrier = PLA_DENSITY * math.pi * r_extent**2 * rotor.carrier_thickness_m
         j_carrier = 0.5 * m_carrier * r_extent**2
-        return j_mag + j_carrier
+        return (j_mag + j_carrier) * sides
 
     # --- arc (continuous pole-arc ring) ---
     r_i = rotor.magnet_r_inner_m
@@ -82,7 +86,7 @@ def rotor_inertia(rotor: RotorConfig) -> float:
     j_carrier = 0.5 * m_carrier * r_o**2
 
     # moving back iron: 0 for the default sandwich (iron is fixed)
-    return j_mag + j_carrier
+    return (j_mag + j_carrier) * sides
 
 
 def total_inertia(rotor: RotorConfig, load_inertia_kgm2: float) -> float:

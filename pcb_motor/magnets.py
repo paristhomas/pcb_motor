@@ -32,6 +32,28 @@ def i_eq(rotor: RotorConfig) -> float:
     return (br / MU0) * rotor.magnet_thickness_m
 
 
+def validate_rotor_sides(rotor: RotorConfig) -> None:
+    """Validate the ``rotor_sides`` topology flags (raises ``ValueError``).
+
+    ``rotor_sides == 2`` is the dual-rotor sandwich: ONE stator board between
+    TWO magnet rotors and no iron anywhere, so it excludes the dual-stator and
+    back-iron topologies.
+    """
+    if rotor.rotor_sides not in (1, 2):
+        raise ValueError(f"rotor_sides must be 1 or 2, got {rotor.rotor_sides!r}")
+    if rotor.rotor_sides == 2:
+        if rotor.n_stators != 1:
+            raise ValueError(
+                "rotor_sides=2 (dual-rotor sandwich: one stator board between two "
+                f"magnet rotors) requires n_stators == 1, got {rotor.n_stators}"
+            )
+        if rotor.back_iron:
+            raise ValueError(
+                "rotor_sides=2 (dual-rotor sandwich) is coreless by construction: "
+                "back_iron must be False"
+            )
+
+
 def _arc_xy(r: float, a0: float, a1: float, n_arc: int) -> np.ndarray:
     """``n_arc`` points (x, y) along the arc of radius ``r`` from ``a0`` to
     ``a1`` (inclusive of both endpoints)."""
@@ -173,11 +195,23 @@ def magnet_segments(
       - ``"round_outer"`` -- outer ring of discs only (inner ring removed).
       - ``"round_inner"`` -- inner ring of discs only (outer ring removed).
     Alternating polarity per pole; ``theta_rad`` rotates the rotor about z.
+
+    ``rotor.rotor_sides == 2`` (dual-rotor sandwich) adds a second, identical
+    magnet plane at ``z = 2 * stator_z``: every Amperian loop of the z=0 rotor
+    is duplicated, translated axially, with the SAME current sense. Same sense
+    means the two rotors' magnetisations are aligned (each pole faces its
+    opposite polarity across the board -- the attracting arrangement), so the
+    axial fields of the two planes ADD at the stator board between them
+    (verified numerically: Bz at the stator plane ~2x the single-rotor value).
     """
+    validate_rotor_sides(rotor)
     if is_round(rotor.magnet_topology):
         loops = _round_two_ring_loops(rotor, theta_rad, n_stack=n_stack)
     else:
         loops = _magnet_loops(rotor, theta_rad, n_arc, n_stack)
+    if rotor.rotor_sides == 2:
+        dz = np.array([0.0, 0.0, 2.0 * rotor.stator_z_m()])
+        loops = loops + [(verts + dz, i_signed) for verts, i_signed in loops]
     sources = []
     for verts, i_signed in loops:
         currents = np.full(verts.shape[0], i_signed)

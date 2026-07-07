@@ -137,6 +137,11 @@ class RotorConfig:
     board_thickness_m: float = 0.8e-3
     copper_weight_oz: float = 1.0
     n_stators: int = 2
+    rotor_sides: int = 1               # 2 = dual-rotor sandwich: ONE stator board
+                                       # between TWO magnet rotors (second magnet
+                                       # plane at z = 2*stator_z, same magnetisation
+                                       # pattern, attracting -- axial fields ADD).
+                                       # Requires n_stators == 1 and back_iron False.
     carrier_thickness_m: float = 1.5e-3
     # Rotor magnet shape: "arc" (continuous pole-arc ring, parametrised by
     # magnet_r_inner/outer + pole_coverage); "round" (two concentric rings of
@@ -197,6 +202,9 @@ class MotorDesign:
     board_thickness_m: float = 0.8e-3
     copper_weight_oz: float = 1.0
     n_stators: int = 2
+    rotor_sides: int = 1               # 2 = dual-rotor sandwich (one stator board
+                                       # between two magnet rotors); requires
+                                       # n_stators == 1 and back_iron False
     carrier_thickness_m: float = 1.5e-3
     magnet_topology: str = "arc"       # arc | round | round_outer | round_inner
     outer_ring_r_m: float = 37.2e-3
@@ -235,6 +243,7 @@ class MotorDesign:
             board_thickness_m=self.board_thickness_m,
             copper_weight_oz=self.copper_weight_oz,
             n_stators=self.n_stators,
+            rotor_sides=self.rotor_sides,
             carrier_thickness_m=self.carrier_thickness_m,
             magnet_topology=self.magnet_topology,
             outer_ring_r_m=self.outer_ring_r_m,
