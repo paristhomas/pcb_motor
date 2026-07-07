@@ -49,6 +49,7 @@ constants (JLC 1 oz rules) stay module constants.
 from __future__ import annotations
 
 import dataclasses
+import os
 import re
 from dataclasses import dataclass, field
 
@@ -1152,6 +1153,8 @@ def build_footprint(
             f"worst clearance {report.worst_clearance_mm:.3f} mm "
             f"(need >= {ts_mm:.3f} mm); nothing written"
         )
+    parent = os.path.dirname(os.path.abspath(out_path))
+    os.makedirs(parent, exist_ok=True)
     with open(out_path, "w", encoding="utf-8", newline="\r\n") as fh:
         fh.write(text)
     return report
