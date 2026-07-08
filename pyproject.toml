@@ -31,5 +31,8 @@ Homepage = "https://github.com/paristhomas/pcb_motor"
 [tool.setuptools.packages.find]
 include = ["pcb_motor*"]
 
+[tool.setuptools.package-data]
+pcb_motor = ["*.css", "*.js"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

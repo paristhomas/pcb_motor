@@ -115,8 +115,9 @@ to a board house, `pcb-motor footprint --session <name>` builds the production
 two-sided filled-copper stator footprint — net-bearing terminal pads, via stitch,
 clearance-verified against JLC rules *before* it writes — and `--project` wraps it
 in a complete KiCad project with the WYE pre-wired. Rounding out the CLI: `config`
-(the setup figure), `compare` (sessions side by side), and `sweep` / `optimize`
-(interactive dashboards and optuna, with the `[sweep]` extra).
+(the setup figure), `showcase` (the shareable single-file story page — see below),
+`compare` (sessions side by side), and `sweep` / `optimize` (interactive dashboards
+and optuna, with the `[sweep]` extra).
 
 Here's a 36-slot / 42-pole demo winding the engine generated, and the actual
 Biot–Savart field its rotor puts through the stator plane:
@@ -157,6 +158,15 @@ choke-free from an ODrive is infeasible by 32×; budget ~204 µH of external ind
 per phase.* The directory has the requirements, the saved design, the datasheet, the
 clearance-verified footprint, the ready KiCad project, and a README telling the whole
 story — including the part where the tool says no.
+
+The best way to meet it is the **[showcase report](https://paristhomas.github.io/pcb_motor/examples/odrive80/report.html)**
+([examples/odrive80/report.html](examples/odrive80/report.html) in the repo) — one
+self-contained HTML page from `pcb-motor showcase`: the rotor spinning over the real
+copper with the Biot–Savart field, the zoomable board artwork, the exploded stack,
+the trace-width trade charts, and the FAIL verdict in large print. There's a
+[second page for the default machine](https://paristhomas.github.io/pcb_motor/examples/demo_12n14p/report.html)
+([examples/demo_12n14p/report.html](examples/demo_12n14p/report.html)) if you want
+to see what every fresh design gets for free.
 
 ## The physics, honestly
 

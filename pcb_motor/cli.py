@@ -4,6 +4,7 @@
     pcb-motor fields       (grouped listing of every settable MotorDesign field)
     pcb-motor point        [--session NAME] [--set field=value ...]
     pcb-motor report       [--session NAME | --set ...]
+    pcb-motor showcase     [--session NAME] [--sweep 0.2,0.3,0.5] [--out page.html]
     pcb-motor datasheet    [--session NAME | --set ...]
     pcb-motor compare      NAME1 NAME2 ...
     pcb-motor footprint    --session NAME [--single-tooth] [--project]
@@ -289,6 +290,27 @@ def main(argv=None) -> int:
     pds.add_argument("--name", help="datasheet title")
     pds.add_argument("--root", default="designs")
 
+    psc = sub.add_parser(
+        "showcase",
+        help="build the self-contained narrative showcase page (spinning motor, "
+             "copper viewer, exploded stack, trade-off charts) for a design")
+    psc.add_argument("--set", action="append", default=[], dest="sets")
+    psc.add_argument("--session", help="load the design from designs/<name>/")
+    psc.add_argument("--out",
+                     help="output HTML path (default: designs/<name>/report.html)")
+    psc.add_argument("--name", help="page title (default: session name)")
+    psc.add_argument("--narrative",
+                     help="narrative markdown file (default: the session's "
+                          "narrative.md if present; missing sections are "
+                          "auto-generated)")
+    psc.add_argument("--sweep",
+                     help="comma-separated trace widths in mm to re-evaluate for "
+                          "the design-hunt charts (slow: one full engine run per "
+                          "width), e.g. --sweep 0.15,0.2,0.3,0.5")
+    psc.add_argument("--draft", action="store_true",
+                     help="lower-fidelity torque/field sampling for quick previews")
+    psc.add_argument("--root", default="designs")
+
     pcmp = sub.add_parser("compare", help="compare saved design sessions side by side")
     pcmp.add_argument("names", nargs="+", help="session names under designs/")
     pcmp.add_argument("--out", help="write the comparison table to this Markdown file")
@@ -414,8 +436,13 @@ def main(argv=None) -> int:
         print(f"  worst clearance  {rep.worst_clearance_mm:.3f} mm "
               f"(need >= {rep.clearance_needed_mm:.3f} mm)")
         print(f"  coils            {rep.n_coils} x {rep.turns_per_coil} turns")
+        def _pad_key(nm: str):
+            digits = "".join(ch for ch in nm if ch.isdigit())
+            return (int(digits) if digits else 0, nm)
+
+        pads_ordered = sorted(rep.pad_names, key=_pad_key)
         print(f"  pads             {len(rep.pad_names)} "
-              f"({rep.pad_names[0]} .. {rep.pad_names[-1]})")
+              f"({pads_ordered[0]} .. {pads_ordered[-1]})")
         print(f"  bridges          {rep.n_bridges}")
         print(f"  vias per coil    {rep.n_vias_per_coil} "
               f"(stitch track {rep.conn_track_w_mm:.2f} mm)")
@@ -448,6 +475,33 @@ def main(argv=None) -> int:
         out = args.out or (str(session.report_html) if session else "design_report.html")
         R.build_design_report(design, out, name=args.name, rich=args.rich)
         print(f"design report written to {out}")
+        return 0
+
+    if args.cmd == "showcase":
+        from . import showcase as SC
+        design, session = _resolve_design(args)
+        design = _apply_overrides(design, args.sets)
+        out = args.out or (str(session.dir / "report.html") if session
+                           else "showcase.html")
+        sweep_data = None
+        if args.sweep:
+            widths_mm = [float(w) for w in args.sweep.split(",") if w.strip()]
+            print(f"sweeping trace width over {widths_mm} mm "
+                  f"({len(widths_mm)} full evaluations -- this takes a while)")
+            sweep_data = SC.trace_width_sweep(
+                design, [w * 1e-3 for w in widths_mm],
+                progress=lambda pt: print(
+                    f"  {pt['x']:g} mm -> tau {pt['tau_cont_mNm']:.3g} mNm, "
+                    f"L {pt['l_phase_uH']:.3g} uH, "
+                    f"ripple {pt['pwm_ripple_A_pp']:.3g} A pp"))
+        fidelity = ({"torque_steps": 16, "field_nr": 16, "field_nphi": 96}
+                    if args.draft else {})
+        path = SC.build_showcase(design, out, session=session, name=args.name,
+                                 narrative=args.narrative, sweep_data=sweep_data,
+                                 **fidelity)
+        import os
+        print(f"showcase page written to {path} "
+              f"({os.path.getsize(path) / 1e6:.2f} MB, self-contained)")
         return 0
 
     if args.cmd == "datasheet":
