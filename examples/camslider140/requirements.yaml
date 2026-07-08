@@ -1,0 +1,44 @@
+# camslider140 — requirements captured from the application brief
+application: >-
+  Pancake BLDC for a lightweight camera slider / pan-head DIRECT DRIVE.
+  Coreless axial-flux, dual-stator sandwiching a single rotor disc.
+
+objective: maximize continuous torque at the thermal limit
+torque_cont_mNm: 40-60 desired ("would be great"); report what the 140 mm envelope actually gives
+speed_rev_s: low (direct-drive pan/slide); not a design driver
+
+drive:
+  type: ODrive FOC
+  voltage_V: 24               # hard: 24 V bus (drive_v_bus=24)
+  f_pwm_hz: 24000             # stock ODrive v3.6 switching frequency
+  ripple_budget: 0.30 * i_cont # repo default gate
+
+envelope_od_mm: 140           # HARD limit
+envelope_axial_mm: thin stack (~8 mm achieved)
+bore: center hub for shaft/bearing (r_inner 30 mm)
+duty: continuous
+
+hard_constraints:
+  topology: dual-stator / single-rotor (n_stators=2, rotor_sides=1)
+  back_iron: NONE anywhere
+  boards: two 2-layer 0.8 mm FR4 (copper_layers=2 each, board_thickness=0.8 mm)
+  fab: JLCPCB standard, 1 oz copper, 5/5 mil (0.127 mm) min trace/space
+  magnets: off-the-shelf ROUND disc magnets only (magnet_topology=round)
+
+chosen_design:
+  slot_pole: 24N28P (n_slots=24, pole_pairs=14) — verified, kw1=0.937
+  r_outer_mm: 67 (134 mm copper OD, 3 mm rim to 140 mm board edge)
+  r_inner_mm: 30
+  magnets: N52, Ø12 mm x 3 mm outer ring @ r=58 mm; Ø8 mm x 3 mm inner ring @ r=40 mm
+           (28 outer + 28 inner discs; carrier walls ~1.0 mm)
+  trace: tapered wedges, 0.6 mm neck width at r_inner, 0.127 mm space
+  rationale: >-
+    24N28P beat 12N14P (higher torque, half the end-turn loss at 140 mm OD) and
+    36N42P (round-disc packing forces tiny Ø6/Ø4 discs -> b_gap collapses to 0.037 T).
+    0.6 mm neck brings continuous drive voltage to ~11.6 V (>2x margin under 24 V)
+    at flat ~142 mNm torque.
+
+open_questions_gate:
+  - PWM ripple fails the no-choke gate by ~16x: needs ~536 uH/phase SERIES choke,
+    rated >= i_cont (~1.5 A). Inherent to coreless uH-class windings; reported honestly.
+  - Absolute torque is analytical, ~+/-30% (air gap, Br tolerance, etch). Bench-Kt/FEMM before spend.

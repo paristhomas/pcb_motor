@@ -91,6 +91,12 @@ default and meaning). Choose the annulus from the envelope, and a
   (6N8P scores exactly 0.000). After ANY change to `n_slots`/`pole_pairs`, check the
   printed `Winding factor kw1` is ≥0.9; if not, say so and fix the combo before
   optimizing anything.
+- **With round-disc magnets, more poles is NOT always more torque.** More poles means
+  smaller discs to fit the pole pitch, which drops the airgap field and can *lose*
+  torque despite the higher pole count. On larger boards (≳120 mm) don't assume the
+  biggest combo wins — evaluate 12N14P / 24N28P / 36N42P for the actual envelope and
+  compare `tau_cont_mNm` and end-turn loss. (An independent 140 mm eval found 24N28P
+  beat 36N42P for exactly this reason — see `examples/camslider140/`.)
 
 If the user's magnet stock is off-the-shelf round discs (it usually is), set
 `magnet_topology=round` and describe the rotor with the four round fields:
