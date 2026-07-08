@@ -83,6 +83,8 @@ default and meaning). Choose the annulus from the envelope, and a
 
 - **12N14P** (`n_slots=12, pole_pairs=7`) — the small-motor default, kw1≈0.94.
   The 12-slot table also serves 12N10P.
+- **24N28P** (`n_slots=24, pole_pairs=14`) — mid diameters (~100–130 mm OD),
+  kw1≈0.94; the 12N14P family tiled twice.
 - **36N42P** (`n_slots=36, pole_pairs=21`) — large diameters (~80–100 mm OD),
   kw1≈0.95, short end-turns.
 - Anything else falls back to a round-robin layout that can **silently give kw1≈0**

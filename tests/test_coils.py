@@ -12,6 +12,17 @@ from pcb_motor.coils import build_coil, phase_resistance
 from pcb_motor.design import MotorDesign
 
 
+def test_verified_layout_24n28p():
+    """24N28P is a verified concentrated combo (the 12N14P family tiled twice),
+    not the round-robin fallback that collapses kw1 -> 0."""
+    from pcb_motor.coils import _LAYOUTS, _coil_layout, winding_factor
+
+    assert _LAYOUTS[24] == _LAYOUTS[12] * 2
+    assert _coil_layout(24, 3) == _LAYOUTS[24]        # tabulated, not fallback
+    d = dataclasses.replace(MotorDesign(), n_slots=24, pole_pairs=14)
+    assert winding_factor(d) >= 0.9                   # ~0.933
+
+
 def test_turns_fit():
     """radial_spoke: n_turns matches the documented mean-radius packing rule,
     and widening the trace reduces the turn count."""

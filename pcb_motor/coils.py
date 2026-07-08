@@ -405,6 +405,12 @@ _LAYOUTS: dict[int, list[tuple[int, int]]] = {
 # this entry assumes the matching 42-pole rotor (a plain 6x tiling WITHOUT the
 # polarity alternation puts same-phase coils in antiphase and kw collapses to 0).
 _LAYOUTS[36] = _LAYOUTS[12] * 3
+# 24N28P (double-layer, all teeth wound): the 12N14P pattern tiled twice, valid
+# for the SAME reason as 36N42P -- tooth k and tooth k+12 sit at identical
+# electrical angles (slot angle 14 * 2*pi/24 = 210 deg elec; 12 * 210 deg =
+# 2520 deg = 7 full turns). kw1 = 0.933, the 12N14P family. Assumes the matching
+# 28-pole rotor (14 pole-pairs).
+_LAYOUTS[24] = _LAYOUTS[12] * 2
 
 
 def _coil_layout(n_slots: int, n_phases: int) -> list[tuple[int, int]]:
