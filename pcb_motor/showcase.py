@@ -435,25 +435,48 @@ def _artwork_from_kicad(path: str | Path, design: MotorDesign) -> dict:
             layers[m.group(2)].append(
                 {"tooth": _tooth_of(cx, cy, n_slots), "pts": _ring_pts(pts)})
 
+    # Custom pads: one polygon each on the standard footprint (the terminal
+    # pads), but MANY polygons per pad on the routed boards, where every bit
+    # of copper is a net-bearing pad. Parse per pad block and keep them all.
     pads = []
-    for m in re.finditer(
-            r'\(pad "([^"]+)" smd custom \(at ([-\d.]+) ([-\d.]+)(?: ([-\d.]+))?\)'
-            r'.*?\(layers "?([^")\s]+)"?\)'
-            r".*?\(primitives \(gr_poly \(pts (.*?)\) \(width", txt, re.S):
-        name, cx, cy = m.group(1), float(m.group(2)), float(m.group(3))
-        rot = math.radians(float(m.group(4) or 0.0))
-        layer = "F" if m.group(5).startswith("F") else "B"
+    pad_polys: list[tuple[str, list]] = []   # (F|B, ring pts) for every poly
+    for block in txt.split('(pad "')[1:]:
+        head = re.match(
+            r'([^"]+)" smd custom \(at ([-\d.]+) ([-\d.]+)(?: ([-\d.]+))?\)',
+            block)
+        lay = re.search(r'\(layers "?([^")\s]+)"?\)', block)
+        if not head or not lay:
+            continue
+        name, cx, cy = head.group(1), float(head.group(2)), float(head.group(3))
+        rot = math.radians(float(head.group(4) or 0.0))
+        layer = "F" if lay.group(1).startswith("F") else "B"
         cosr, sinr = math.cos(rot), math.sin(rot)
-        pts = []
-        for a, b in re.findall(r"\(xy ([-\d.]+) ([-\d.]+)\)", m.group(6)):
-            x, y = float(a), float(b)
-            # rotate primitive by the pad angle (KiCad rotates CCW in its frame),
-            # translate to the pad centre, then flip y into our frame.
-            xr = x * cosr + y * sinr
-            yr = -x * sinr + y * cosr
-            pts.append((cx + xr, -(cy + yr)))
-        if len(pts) >= 3:
-            pads.append({"name": name, "layer": layer, "pts": _ring_pts(pts)})
+        polys = []
+        for g in re.finditer(r"\(gr_poly \(pts (.*?)\) \(width", block, re.S):
+            pts = []
+            for a, b in re.findall(r"\(xy ([-\d.]+) ([-\d.]+)\)", g.group(1)):
+                x, y = float(a), float(b)
+                # rotate primitive by the pad angle (KiCad rotates CCW in its
+                # frame), translate to the pad centre, then flip y into our frame.
+                xr = x * cosr + y * sinr
+                yr = -x * sinr + y * cosr
+                pts.append((cx + xr, -(cy + yr)))
+            if len(pts) >= 3:
+                polys.append(_ring_pts(pts))
+        if polys:
+            pads.append({"name": name, "layer": layer, "pts": polys[0]})
+            pad_polys.extend((layer, p) for p in polys)
+
+    if not layers["F.Cu"] and not layers["B.Cu"] and pad_polys:
+        # Routed-style board: ALL copper lives in net-bearing pads. Show it as
+        # copper (per layer); the thru-hole markers below cover the terminals.
+        for layer, pts in pad_polys:
+            key = "F.Cu" if layer == "F" else "B.Cu"
+            cx = sum(p[0] for p in pts) / len(pts)
+            cy = sum(p[1] for p in pts) / len(pts)
+            layers[key].append(
+                {"tooth": _tooth_of(cx, cy, n_slots), "pts": pts})
+        pads = []
 
     vias = [[round(float(a), 3), round(-float(b), 3)]
             for a, b in re.findall(r"thru_hole \w+ \(at ([-\d.]+) ([-\d.]+)\)", txt)]
