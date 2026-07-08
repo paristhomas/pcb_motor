@@ -10,6 +10,11 @@ Internally the arithmetic runs in the historical cm/gauss unit system (where
 inherited from the reference kernel this implementation was cross-validated
 against. This module is the *only* place unit conversion happens: callers pass
 metres / amperes and get tesla back.
+
+This is an independent NumPy reimplementation; it does not reuse any of that
+kernel's code. Acknowledgement to the "Biot-Savart Magnetic Field Calculator"
+by Mingde Yin and Ryan Zazo, the reference against which this module's output
+was cross-validated (and the source of the cm/gauss convention above).
 """
 
 from __future__ import annotations

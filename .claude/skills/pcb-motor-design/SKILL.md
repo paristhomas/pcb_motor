@@ -192,6 +192,30 @@ Markdown datasheet.
   that canonical name, whatever the source file was called) — the project reads the
   vendored copy, so regenerate the project if you regenerate the footprint.
 
+### Stage 7 — Board + Gerbers (fab-ready)
+`pcb-motor board --session <name> --gerbers` wraps the footprint in a complete
+`.kicad_pcb` and, with `--gerbers`, plots the fab-ready Gerber + Excellon-drill zip
+via `kicad-cli`. Output lands in `designs/<name>/kicad_board/` (or
+`kicad_routed_tabs/` for a session shipping a verbatim routed footprint, e.g.
+gimbal90). Python API:
+
+  ```python
+  from pcb_motor.kicad import build_board, export_gerbers
+  rep = build_board(design, "designs/<name>/kicad_board")
+  grep = export_gerbers(rep.pcb_path)      # -> <name>_gerbers.zip
+  ```
+
+Two things to relay honestly to the user:
+- **kicad-cli is required for Gerbers** (KiCad ≥ 7 — a native install, or a Windows
+  KiCad reachable from WSL; auto-detected, or pass `--kicad-cli`). If it is absent
+  the `.kicad_pcb` is still written and the Gerber step is skipped with an
+  actionable message — never treat that as success.
+- **The cross-ring phase interconnect is left as a ratsnest** for the user to route
+  in KiCad (`rep.ratsnest_joins` says how many joins remain). The coil copper is
+  netless graphic: the board is fully manufacturable and plots correctly, but it is
+  NOT connectivity-DRC-clean, and that final interconnect routing is the one manual
+  step. Do not claim the board is finished-and-routed when it is not.
+
 ## Reading the headline metrics (for answering questions)
 
 `kt_mNm_per_A` torque constant; `tau_cont_mNm` continuous torque (= Kt·I_cont,

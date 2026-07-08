@@ -1,36 +1,33 @@
 # pcb_motor
 
-**Design a motor that IS a circuit board.**
+**Design a motor whose stator is a printed circuit board.**
 
-No windings to wind, no laminations to stack, no shaded-pole mystery meat. A coreless
-axial-flux motor where the stator is just... a PCB. Copper spirals do the work of wire,
-your board house does the work of a winding shop, and you glue magnets to a disk. This
-repo takes you from "I want roughly this much torque in roughly this much space" to
-Gerber-ready KiCad files you upload to JLCPCB.
+A coreless axial-flux motor where the stator is a PCB: copper spirals replace wound
+wire, the board house replaces the winding shop, and the rotor is disc magnets glued to
+a carrier. This repo takes you from "roughly this much torque in roughly this much
+space" to a Gerber zip you can upload to a fab — via an analytical physics engine, a
+production coil-artwork generator, and a report generator.
 
 ![Motor setup: winding, rotor, and axial stack](docs/images/motor_setup.png)
 
-Under the hood it's a real analytical physics engine — vectorized Biot–Savart on the
-actual copper geometry, Amperian current-loop magnets, proper 3-phase commutation —
-plus a coil-artwork generator that emits production KiCad footprints with connectable
-terminal pads, and a report generator so you can show your friends numbers.
+Under the hood: a vectorized Biot–Savart field solver on the actual copper geometry,
+Amperian current-loop magnets, proper 3-phase commutation, a coil-artwork generator that
+emits production KiCad footprints with net-bearing terminal pads, a board generator that
+wraps them into a complete `.kicad_pcb`, and a `kicad-cli` step that plots fab-ready
+Gerbers.
 
-## The part where you don't read the rest of this
+## Driving it with Claude
 
-Who are we kidding — you're not going to memorize a CLI. This repo ships a Claude
-skill (`.claude/skills/pcb-motor-design`), so you can open [Claude Code](https://claude.com/claude-code)
-in the repo and say:
+The repo ships a Claude skill (`.claude/skills/pcb-motor-design`), so you can open
+[Claude Code](https://claude.com/claude-code) in the repo and describe what you want:
 
 > "design me a pancake motor for a camera gimbal, about 50 mNm continuous, 80 mm max
 > diameter, 24 V bus"
 
-and it will interview you about the requirements you forgot you had, seed a design,
-iterate it against your envelope, run the feasibility gates, and hand you KiCad files
-and an HTML report. That's the intended UX.
-
-If you're the manual-transmission type, [docs/design_guide.md](docs/design_guide.md)
-is the full stage-by-stage walkthrough. The rest of this README is the five-minute
-version.
+It captures the requirements, seeds a design, iterates it against your envelope, runs
+the feasibility gates, and produces the KiCad files, Gerbers, and an HTML report. That
+is the intended workflow. [docs/design_guide.md](docs/design_guide.md) is the full
+stage-by-stage walkthrough; the rest of this README is the short version.
 
 ## Install
 
@@ -40,14 +37,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Core deps: numpy, scipy, matplotlib, pyyaml, shapely. The optional `[sweep]` extra
-adds `holobench` for interactive parameter-sweep dashboards and optuna search.
+Core deps: numpy, scipy, matplotlib, pyyaml, shapely. The optional `[sweep]` extra adds
+`holobench` for interactive parameter-sweep dashboards and optuna search. Exporting
+Gerbers additionally needs **KiCad ≥ 7** on the machine (the `kicad-cli` it ships); the
+tool auto-detects a native install or a Windows KiCad reachable from WSL.
 
 ## The five-minute tour
 
 Every design lives in a *session* — a directory under `designs/<name>/` holding the
 saved motor plus everything you generate for it. Seed one from defaults (a 60 mm-class
-12-slot/14-pole twin-stator machine) and it immediately evaluates:
+12-slot / 14-pole twin-stator machine) and it evaluates immediately:
 
 ```text
 $ pcb-motor new --session my-first-motor
@@ -61,8 +60,6 @@ pcb-motor point  [concentrated, 7pp, N42, 2 stator(s)]
   Continuous current                 0.3175 A
   Mean airgap |Bz|                   0.1823 T
   ...
-  Turns / phase / layer-set              96
-  ...
   Phase inductance (air-core)         76.86 uH
   PWM ripple @bus/fsw                 1.626 A pp
   Ext. L for ripple budget             1235 uH
@@ -75,17 +72,14 @@ WARNINGS (1):
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ```
 
-The skeleton `requirements.yaml` is for your torque/speed/voltage/envelope/duty
-targets, so the design and its requirements travel together. And yes — the default
-design greets you with a wall of exclamation marks. That's the no-choke feasibility
-gate doing its job (air-core PCB windings have tiny inductance; the design guide's
-Stage 5 is entirely about this). The tool would rather shout now than after you've
-ordered boards.
+The skeleton `requirements.yaml` holds your torque/speed/voltage/envelope/duty targets,
+so the design and its requirements travel together. The wall of exclamation marks is the
+no-choke feasibility gate: air-core PCB windings have very little inductance, so most
+small designs need a series choke to run from a PWM drive. The gate reports that now
+rather than after boards are ordered (design guide Stage 5 is entirely about this).
 
-Poke at the design without committing to anything — `--set` overrides any
-`MotorDesign` field on top of the saved session, and `pcb-motor fields` prints every
-settable field, grouped, with its default and meaning, so you never have to guess a
-name:
+`--set` overrides any `MotorDesign` field on top of the saved session, and
+`pcb-motor fields` prints every settable field, grouped, with its default and meaning:
 
 ```text
 $ pcb-motor point --session my-first-motor --set trace_width_m=0.2e-3
@@ -105,22 +99,29 @@ design report written to designs/my-first-motor/design_report.html
 $ pcb-motor datasheet --session my-first-motor
 datasheet written to designs/my-first-motor/datasheet.md
 
-$ pcb-motor export --session my-first-motor --single-coil --out designs/my-first-motor/coil.kicad_mod
-KiCad footprint written to designs/my-first-motor/coil.kicad_mod (single coil: 1 traces,
-1557 fp_line segments, width 0.150 mm on F.Cu)
+$ pcb-motor footprint --session my-first-motor
+footprint written to designs/my-first-motor/stator_full_2side.kicad_mod (PASS, ...)
+
+$ pcb-motor board --session my-first-motor --gerbers
+board written to designs/my-first-motor/kicad_board (PASS)
+SUMMARY: PASS  (12 files, zip pcb_motor_stator_gerbers.zip)  kicad-cli 9.0.7
 ```
 
-That `export` is the quick eyeball-it-in-KiCad artwork. When you're actually heading
-to a board house, `pcb-motor footprint --session <name>` builds the production
-two-sided filled-copper stator footprint — net-bearing terminal pads, via stitch,
-clearance-verified against JLC rules *before* it writes — and `--project` wraps it
-in a complete KiCad project with the WYE pre-wired. Rounding out the CLI: `config`
-(the setup figure), `showcase` (the shareable single-file story page — see below),
-`compare` (sessions side by side), and `sweep` / `optimize` (interactive dashboards
-and optuna, with the `[sweep]` extra).
+`footprint` builds the production two-sided filled-copper stator footprint — net-bearing
+terminal pads, via stitch, clearance-verified against JLC rules *before* it writes.
+`board` wraps that footprint in a complete `.kicad_pcb` (board outline, bore, WYE nets),
+and `--gerbers` plots the fab-ready Gerber + drill set and zips it. For the general
+board path the coil copper plots as filled polygons and the cross-ring phase
+interconnect is left as a ratsnest for you to route in KiCad — the board is
+manufacturable, and that last routing step is the one thing the tool leaves to you.
+(The `export` command is a quick `fp_line` artwork preview for eyeballing in KiCad.)
 
-Here's a 36-slot / 42-pole demo winding the engine generated, and the actual
-Biot–Savart field its rotor puts through the stator plane:
+Rounding out the CLI: `config` (setup figure), `showcase` (the shareable single-file
+story page — see below), `compare` (sessions side by side), and `sweep` / `optimize`
+(interactive dashboards and optuna, with the `[sweep]` extra).
+
+Here's a 36-slot / 42-pole demo winding the engine generated, and the Biot–Savart field
+its rotor puts through the stator plane:
 
 ![36N42P coil layout](docs/images/coil_layout.png)
 
@@ -128,85 +129,91 @@ Biot–Savart field its rotor puts through the stator plane:
 
 ## What you get
 
-- **Coil artwork** — `.kicad_mod` footprints of the real winding. The quick exporter
-  gives `fp_line` traces; the production builder
+- **Coil artwork** — `.kicad_mod` footprints of the real winding. The production builder
   (`pcb_motor.kicad.build_footprint`) emits two-sided filled-copper artwork with
-  **connectable net-bearing terminal pads**, mirrored back-layer copper (so the two
-  layers add torque instead of cancelling it — ask us how we know), a via stitch
-  between layers, and in-footprint series bridges. It shapely-verifies every clearance
-  against JLC 1 oz rules *before* writing, and refuses to emit a failing board.
-- **A full KiCad project** — `pcb_motor.kicad.build_kicad_project` writes a symbol
-  library, a schematic with the 3-phase WYE pre-wired to a single stator symbol, and
-  library tables. Pin numbers equal footprint pad names by construction.
+  net-bearing terminal pads, mirrored back-layer copper (so the two layers add torque
+  rather than cancel it), a via stitch between layers, and in-footprint series bridges.
+  It shapely-verifies every clearance against JLC 1 oz rules before writing and refuses
+  to emit a failing board.
+- **A complete KiCad board** — `pcb_motor.kicad.build_board` wraps the footprint in a
+  full `.kicad_pcb` (board outline, bore, mounting holes, WYE nets bound to the terminal
+  pads), alongside the symbol library and pre-wired 3-phase schematic from
+  `build_kicad_project`. gimbal90 additionally ships a verbatim fully-routed board.
+- **Fab-ready Gerbers** — `pcb_motor.kicad.export_gerbers` runs `kicad-cli` to plot the
+  standard 2-layer set (copper, mask, silkscreen, paste, edge cuts) plus an Excellon
+  drill file, and zips it for upload.
 - **An HTML design report and Markdown datasheet** — every headline number plus the
-  setup figures, ready to paste into a build log.
+  setup figures and a self-contained showcase page.
 - **Honest feasibility numbers** — thermal continuous current, drive voltage at that
-  current, current density, airgap shear, rotor inertia, and the
-  "do I need a series choke for my ODrive" gate: air-core PCB windings have tiny
-  inductance, so the tool reports worst-case PWM current ripple
-  (`v_bus / (4·L·f_pwm)`) and the external inductance needed to hit your ripple
-  budget. Most small PCB motors need that choke. Better to find out now.
+  current, current density, airgap shear, rotor inertia, and the no-choke drive gate:
+  worst-case PWM current ripple (`v_bus / (4·L·f_pwm)`) and the external inductance
+  needed to hit your ripple budget. Most small PCB motors need that choke.
 
-## A real worked example
+## Worked examples
 
 [`examples/odrive80/`](examples/odrive80/) is a complete design session, committed
-as-is: an 80 mm, 42-pole dual-stator pancake built entirely from off-the-shelf round
-disc magnets (42× Ø5 mm + 42× Ø4 mm N52), on two ordinary 2-layer 1 oz JLC boards.
-The tool's verdict: **Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at just under 1 A
-and 3 Ω** — and an honest one-liner the brief didn't want to hear: *driving it
-choke-free from an ODrive is infeasible by 32×; budget ~204 µH of external inductance
-per phase.* The directory has the requirements, the saved design, the datasheet, the
-clearance-verified footprint, the ready KiCad project, and a README telling the whole
-story — including the part where the tool says no.
+as-is: an 80 mm, 42-pole dual-stator pancake built from off-the-shelf round disc magnets
+(42× Ø5 mm + 42× Ø4 mm N52), on two ordinary 2-layer 1 oz JLC boards. The tool's verdict:
+**Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at just under 1 A and 3 Ω**, with an honest
+note the brief didn't ask for: *driving it choke-free from an ODrive is infeasible by
+32×; budget ~204 µH of external inductance per phase.* The directory has the
+requirements, the saved design, the datasheet, the clearance-verified footprint, the
+KiCad project, and a README telling the whole story — including where the tool says no.
 
-The best way to meet it is the **[showcase report](https://paristhomas.github.io/pcb_motor/examples/odrive80/report.html)**
-([examples/odrive80/report.html](examples/odrive80/report.html) in the repo) — one
-self-contained HTML page from `pcb-motor showcase`: the rotor spinning over the real
-copper with the Biot–Savart field, the zoomable board artwork, the exploded stack,
-the trace-width trade charts, and the FAIL verdict in large print. There's a
-[second page for gimbal90](https://paristhomas.github.io/pcb_motor/examples/gimbal90/report.html)
-([examples/gimbal90/report.html](examples/gimbal90/report.html)) — a real 90 mm
-stator that went to fab as Gerbers: fully-routed copper (every coil link, WYE star
-and phase lead baked into the footprint), M3 tab mounts and PTH terminals,
-regenerated by this repo and regression-pinned to the shipped boards
-([examples/gimbal90/](examples/gimbal90/) has the `.kicad_mod` files).
+The best way to meet a design is the **showcase report** — one self-contained HTML page
+from `pcb-motor showcase`: the rotor spinning over the real copper with the Biot–Savart
+field, the zoomable board artwork with its real outline and mounting tabs, the exploded
+stack, the trace-width trade charts, and the drive-gate verdict in large print.
+
+[`examples/gimbal90/`](examples/gimbal90/) is a real 90 mm stator that was **actually
+fabricated**: a fully-routed board (every coil link, WYE star and phase lead baked into
+copper), M3 mounting tabs and PTH terminals. `pcb-motor board --session gimbal90
+--gerbers` regenerates it and plots its Gerbers; the regenerated board is
+coordinate-for-coordinate identical to the manufactured one in
+[`examples/gimbal90/fabricated/`](examples/gimbal90/fabricated/) and the Gerbers match it
+layer-for-layer (see `tests/test_board_fabequiv.py`).
 
 ## The physics, honestly
 
 > This is an **analytical, feasibility-grade model: treat absolute torque as ±30%.**
-> The field solver itself is validated to <1% against closed-form solutions — the
-> error budget is dominated by what the model *doesn't* capture: magnet Br tolerance
-> and fringing, your actual assembled air gap (the single most sensitive parameter,
-> and the one your 3D-printed parts control), and etching/plating variation in the
-> copper. Relative comparisons between designs are much better than ±30%. Calibrate
-> against FEMM or a bench coil before you commit money to a build. Details and
-> validation notes in [docs/physics.md](docs/physics.md).
+> The field solver itself is validated to <1% against closed-form solutions — the error
+> budget is dominated by what the model *doesn't* capture: magnet Br tolerance and
+> fringing, your actual assembled air gap (the single most sensitive parameter, and the
+> one your 3D-printed parts control), and etching/plating variation in the copper.
+> Relative comparisons between designs are much better than ±30%. Calibrate against FEMM
+> or a bench coil before you commit money to a build. Details and validation notes in
+> [docs/physics.md](docs/physics.md).
 
-Limitations, so nobody is surprised later:
+Limitations, stated up front:
 
-- **No magnetic saturation modeling.** Fine for coreless (air doesn't saturate), but
-  the optional back-iron model is method-of-images with µ→∞ plates — a *sanity
-  flag*, not a design tool. It also ignores eddy/hysteresis drag in the plate.
-- **Thermal model is a lumped convection balance** (`h·A·ΔT`) with a guessed film
+- **No magnetic saturation modeling.** Fine for coreless (air doesn't saturate); the
+  optional back-iron model is method-of-images with µ→∞ plates — a *sanity flag*, not a
+  design tool, and it ignores eddy/hysteresis drag in the plate.
+- **Thermal model is a lumped convection balance** (`h·A·ΔT`) with an assumed film
   coefficient — good for "is this thermally plausible", not for hot-spot prediction.
-- **Inductance is ±20%** (Neumann double sum) — right for "do I need a choke", wrong
-  for filter design.
+- **Inductance is ±20%** (Neumann double sum) — right for "do I need a choke", wrong for
+  filter design.
 - **Dual-rotor axial attraction is reported as a warning, not a number.** Two magnet
-  disks facing each other pull *hard*. Size your spacer, hub, and assembly jig for it.
+  disks facing each other pull hard; size the spacer, hub, and assembly jig for it.
 - No cogging (coreless — there is none), no acoustic, no bearing model, no FEA.
 
 ## Docs
 
 - [docs/design_guide.md](docs/design_guide.md) — the full walkthrough: requirements →
-  seed → evaluate → iterate → feasibility gate → KiCad export → fab notes.
-- [docs/physics.md](docs/physics.md) — how the model works and where it lies.
-- [docs/jlc_design_rules.md](docs/jlc_design_rules.md) — JLCPCB rules and IPC current
-  capacity numbers the coil generator designs against.
+  seed → evaluate → iterate → feasibility gate → KiCad board → Gerbers → fab notes.
+- [docs/physics.md](docs/physics.md) — how the model works and where it approximates.
+- [docs/jlc_design_rules.md](docs/jlc_design_rules.md) — JLCPCB rules and IPC
+  current-capacity numbers the coil generator designs against.
 
-A note on housekeeping: `designs/` is where your design sessions land. Session
-definitions (`motor.json`, datasheets) are small and committable; the heavy generated
-artifacts there (HTML reports, PNGs, CSVs) are gitignored.
+Housekeeping: `designs/` is a working area (gitignored) where your sessions land;
+`examples/` holds the committed, published designs.
+
+## Acknowledgements
+
+The Biot–Savart field solver (`pcb_motor/field.py`) is an independent NumPy
+reimplementation cross-validated against the "Biot-Savart Magnetic Field Calculator" by
+Mingde Yin and Ryan Zazo.
 
 ## License
 
-MIT. Motors want to be free.
+MIT — see [LICENSE](LICENSE).
