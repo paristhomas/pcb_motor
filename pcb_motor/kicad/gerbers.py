@@ -16,7 +16,9 @@ gracefully, leaving the ``.kicad_pcb`` on disk for the user to plot by hand.
 from __future__ import annotations
 
 import dataclasses
+import glob
 import os
+import re
 import shutil
 import subprocess
 import zipfile
@@ -72,6 +74,37 @@ class GerberReport:
         return "\n".join(lines)
 
 
+_WIN_KICAD_GLOBS = (
+    "/mnt/c/Program Files/KiCad/*/bin/kicad-cli.exe",
+    "/mnt/c/Program Files (x86)/KiCad/*/bin/kicad-cli.exe",
+)
+
+
+def discover_kicad_cli() -> "str | None":
+    """Best-effort path to a kicad-cli: native on ``PATH`` first, else a Windows
+    KiCad install reachable from WSL (highest version wins). Returns ``None`` if
+    none is found.
+
+    Deliberately NOT called by :func:`export_gerbers` (that stays hermetic and
+    unit-testable); the CLI layer calls this and passes the result explicitly,
+    so tests can still simulate "kicad-cli absent" by mocking ``shutil.which``.
+    """
+    exe = shutil.which("kicad-cli")
+    if exe:
+        return exe
+    cands: list[str] = []
+    for pat in _WIN_KICAD_GLOBS:
+        cands.extend(glob.glob(pat))
+    if not cands:
+        return None
+
+    def _ver(p: str) -> tuple:
+        m = re.search(r"/KiCad/([0-9.]+)/", p)
+        return tuple(int(x) for x in m.group(1).split(".")) if m else (0,)
+
+    return sorted(cands, key=_ver)[-1]
+
+
 def _resolve_cli(kicad_cli: str | None) -> str:
     exe = kicad_cli or shutil.which("kicad-cli")
     if not exe:
@@ -86,6 +119,20 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
         return subprocess.run(cmd, capture_output=True, text=True, check=False)
     except FileNotFoundError as e:                      # exe vanished mid-run
         raise GerberError(f"{cmd[0]}: {e}\n{_INSTALL_HINT}") from e
+
+
+def _is_windows_exe(exe: str) -> bool:
+    """A Windows kicad-cli.exe invoked from WSL -- it needs Windows-style path
+    arguments (WSL paths like /home/... are meaningless to it)."""
+    return exe.lower().endswith(".exe")
+
+
+def _to_win(path: str) -> str:
+    """Translate a WSL path to a Windows/UNC path via ``wslpath -w`` so a
+    Windows kicad-cli.exe can read/write it (e.g. \\\\wsl.localhost\\...)."""
+    cp = subprocess.run(["wslpath", "-w", path], capture_output=True, text=True,
+                        check=False)
+    return cp.stdout.strip() if cp.returncode == 0 and cp.stdout.strip() else path
 
 
 def _version(exe: str) -> str:
@@ -119,22 +166,31 @@ def export_gerbers(
     out_dir = out_dir or os.path.join(pcb_dir, "gerbers")
     os.makedirs(out_dir, exist_ok=True)
 
+    # A Windows kicad-cli.exe (common when driving Windows KiCad from WSL) needs
+    # Windows-style path args; a native Linux kicad-cli takes the paths as-is.
+    win = _is_windows_exe(exe)
+    pcb_arg = _to_win(pcb_path) if win else pcb_path
+    out_arg = _to_win(out_dir) if win else out_dir
+    drill_out = out_arg + ("\\" if win else os.sep)   # trailing sep = a dir
+
+    # Gerbers and drill both plot at the absolute (page) origin so the sets
+    # register with each other; --subtract-soldermask keeps silk off pads.
     gerber_cmd = [
         exe, "pcb", "export", "gerbers",
-        "--output", out_dir,
+        "--output", out_arg,
         "--layers", ",".join(layers),
-        "--use-drill-file-origin",
-        pcb_path,
+        "--subtract-soldermask",
+        pcb_arg,
     ]
     drill_cmd = [
         exe, "pcb", "export", "drill",
-        "--output", out_dir + os.sep,
+        "--output", drill_out,
         "--format", "excellon",
         "--drill-origin", "absolute",
         "--excellon-units", "mm",
-        "--generate-map-file",
+        "--generate-map",
         "--map-format", "gerberx2",
-        pcb_path,
+        pcb_arg,
     ]
 
     stderr_tail = ""

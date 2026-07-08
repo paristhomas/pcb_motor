@@ -881,9 +881,15 @@ def _resolve_artwork(design: MotorDesign, session, artwork_mod,
     if artwork_mod is not None:
         art_path = Path(artwork_mod)
     elif session is not None:
-        cand = session.dir / "stator_full_2side.kicad_mod"
-        if cand.exists():
-            art_path = cand
+        # committed production copper: the general filled-copper footprint, or a
+        # verbatim routed footprint (gimbal90) -- both are real board copper.
+        for cand_name in ("stator_full_2side.kicad_mod",
+                          "stator_routed_2side_tabs.kicad_mod",
+                          "stator_routed_2side.kicad_mod"):
+            cand = session.dir / cand_name
+            if cand.exists():
+                art_path = cand
+                break
 
     reason = None
     if art_path is None and auto_footprint:
