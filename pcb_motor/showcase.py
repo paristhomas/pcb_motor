@@ -212,8 +212,8 @@ def _auto_narrative(design: MotorDesign, results: dict, gate: dict,
                if design.n_stators == 2 else
                f"{design.n_stators} stator board(s) face the rotor across a "
                f"{design.air_gap_m*1e3:.1f} mm air gap.")
-            + " There is no iron: no cogging, no saturation, and honestly not much "
-              "inductance either -- that bill arrives in the drive section."),
+            + " There is no iron: no cogging, no saturation, and little "
+              "inductance -- that constraint surfaces in the drive section."),
         "board": _md_to_html(
             "The actual copper. Scroll to zoom, drag to pan, toggle layers. "
             "The back layer mirrors the front about each coil's centre-line so the "
@@ -924,6 +924,43 @@ def _resolve_artwork(design: MotorDesign, session, artwork_mod,
     return artwork, notice
 
 
+def _circle_poly(r: float, n: int = 128) -> list:
+    """Closed circle as a y-up polyline (mm), for a plain board edge / bore."""
+    return [[round(r * math.cos(2 * math.pi * k / n), 3),
+             round(r * math.sin(2 * math.pi * k / n), 3)] for k in range(n)]
+
+
+def _board_outline(design: MotorDesign, session) -> list:
+    """Board Edge.Cuts outline(s) as closed y-up polylines (mm), ~centred.
+
+    Prefers a committed ``tabs_outline.json`` next to the session -- the exact
+    routed-board edge, mounting tabs and all -- so the viewer shows the real
+    board shape. Otherwise a plain circular edge derived from the design. The
+    winding inner bore is added as a second ring. Concentric with the copper,
+    which is likewise centred, so the two overlay.
+    """
+    import json
+
+    polys = []
+    tabs = None
+    if session is not None:
+        cand = session.dir / "tabs_outline.json"
+        if cand.exists():
+            try:
+                tabs = json.loads(cand.read_text(encoding="utf-8"))["outline_mm"]
+            except Exception:
+                tabs = None
+    if tabs:
+        # KiCad Edge.Cuts is y-down; flip to y-up to match the copper frame.
+        polys.append([[round(float(x), 3), round(-float(y), 3)] for x, y in tabs])
+    else:
+        polys.append(_circle_poly(design.r_outer_m * 1e3 + 2.0))
+    bore = design.r_inner_m * 1e3
+    if bore > 1.0:
+        polys.append(_circle_poly(bore))
+    return polys
+
+
 # --------------------------------------------------------------------------- #
 # Payload assembly
 # --------------------------------------------------------------------------- #
@@ -950,6 +987,7 @@ def _collect_payload(design: MotorDesign, *, session=None, name=None,
     # that announces itself.
     artwork, _art_notice = _resolve_artwork(design, session, artwork_mod,
                                             auto_footprint)
+    artwork["outline"] = _board_outline(design, session)
 
     geo = build_coil(design)
     i_cont = float(results["i_cont_A"]) or 1.0
@@ -1243,7 +1281,7 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     honesty = f"""
 <section id="verdict">
   <div class="kicker">the fine print</div>
-  <h2>Verdict, honestly</h2>
+  <h2>Verdict</h2>
   <div class="prose">{prose['verdict']}</div>
   <div class="honesty panel">
     <p><strong>Model honesty:</strong> this is an analytical, feasibility-grade

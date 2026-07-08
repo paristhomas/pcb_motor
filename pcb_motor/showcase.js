@@ -151,6 +151,11 @@
         m = Math.max(m, Math.abs(q[0]), Math.abs(q[1]));
       });
     });
+    (DATA.artwork.outline || []).forEach(function (poly) {
+      poly.forEach(function (q) {
+        m = Math.max(m, Math.abs(q[0]), Math.abs(q[1]));
+      });
+    });
     return Math.max(m, DATA.magnets.r_out_mm) * 1.05;
   }
 
@@ -363,12 +368,27 @@
       role: "img", "aria-label": "interactive board copper artwork"
     }, host);
 
-    // board outline
+    // board outline: real Edge.Cuts (board edge + mounting tabs + bore) when
+    // available, else a plain circle from the design diameter.
     var gBoard = svgEl("g", {}, svg);
-    svgEl("circle", {
-      cx: 0, cy: 0, r: DATA.meta.od_mm / 2, fill: T.surface,
-      stroke: T.baseline, "stroke-width": 0.25
-    }, gBoard);
+    var outline = DATA.artwork.outline;
+    if (outline && outline.length) {
+      svgEl("path", {                                  // board body (first ring)
+        d: ringPath(outline[0]), fill: T.surface,
+        stroke: T.baseline, "stroke-width": 0.3
+      }, gBoard);
+      for (var oi = 1; oi < outline.length; oi++) {    // bore / cut-outs
+        svgEl("path", {
+          d: ringPath(outline[oi]), fill: T.page,
+          stroke: T.baseline, "stroke-width": 0.3
+        }, gBoard);
+      }
+    } else {
+      svgEl("circle", {
+        cx: 0, cy: 0, r: DATA.meta.od_mm / 2, fill: T.surface,
+        stroke: T.baseline, "stroke-width": 0.25
+      }, gBoard);
+    }
     svgEl("path", {
       d: "M-1.2 0H1.2M0 -1.2V1.2", stroke: T.muted, "stroke-width": 0.12
     }, gBoard);
