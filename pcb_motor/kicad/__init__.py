@@ -19,6 +19,7 @@ Every writer in this package emits CRLF line endings (KiCad saves CRLF;
 mixed endings turn every in-KiCad save into a whole-file diff).
 """
 
+from .board import BoardError, BoardReport, build_board
 from .export import coil_to_kicad_mod, write_coil_kicad_mod
 from .gerbers import JLC_2LAYER, GerberError, GerberReport, export_gerbers
 from .footprint import (
@@ -54,4 +55,7 @@ __all__ = [
     "GerberError",
     "GerberReport",
     "export_gerbers",
+    "BoardError",
+    "BoardReport",
+    "build_board",
 ]
