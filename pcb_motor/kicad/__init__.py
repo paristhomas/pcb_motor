@@ -11,12 +11,16 @@
 - :mod:`pcb_motor.kicad.routed` -- the FULLY-ROUTED 12-slot stator (gimbal90
   routing baked in): coils + WYE interconnect + terminals all inside one
   footprint (every scrap of copper net-bearing), plus its 6-pin project.
+- :mod:`pcb_motor.kicad.gerbers` -- fab-ready Gerber + Excellon-drill export
+  for a ``.kicad_pcb`` by shelling out to KiCad's ``kicad-cli``, zipped for the
+  board house. Degrades gracefully (``GerberError``) when ``kicad-cli`` absent.
 
 Every writer in this package emits CRLF line endings (KiCad saves CRLF;
 mixed endings turn every in-KiCad save into a whole-file diff).
 """
 
 from .export import coil_to_kicad_mod, write_coil_kicad_mod
+from .gerbers import JLC_2LAYER, GerberError, GerberReport, export_gerbers
 from .footprint import (
     FootprintError,
     FootprintReport,
@@ -46,4 +50,8 @@ __all__ = [
     "RoutedStatorReport",
     "build_routed_project",
     "build_routed_stator",
+    "JLC_2LAYER",
+    "GerberError",
+    "GerberReport",
+    "export_gerbers",
 ]
