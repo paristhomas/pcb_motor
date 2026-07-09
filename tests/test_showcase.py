@@ -69,6 +69,17 @@ def _payload(html: str) -> dict:
 # --------------------------------------------------------------------------- #
 # The built page
 # --------------------------------------------------------------------------- #
+def test_phase_of_pad():
+    """Routed-board copper is phase-tinted from the pad net name, not geometry."""
+    assert showcase._phase_of_pad("AL") == 0
+    assert showcase._phase_of_pad("AE") == 0
+    assert showcase._phase_of_pad("BL") == 1
+    assert showcase._phase_of_pad("CE") == 2
+    assert showcase._phase_of_pad("c1") == 2      # case-insensitive
+    assert showcase._phase_of_pad("VIA") is None  # not a phase net
+    assert showcase._phase_of_pad("") is None
+
+
 def test_page_is_self_contained(built_page):
     """No network dependencies: every http(s) occurrence is either the GitHub
     anchor link or the (non-network) SVG XML namespace constant."""

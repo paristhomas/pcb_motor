@@ -416,6 +416,17 @@ def _tooth_of(cx: float, cy: float, n_slots: int) -> int:
     return int(round(math.atan2(cy, cx) / sector)) % n_slots
 
 
+def _phase_of_pad(name: str) -> int | None:
+    """Phase index (A/B/C -> 0/1/2) from a routed-board pad net name.
+
+    Routed boards carry their series interconnect as phase-named nets
+    (``AL``/``AE``, ``BL``/``BE``, ``CL``/``CE``), so the net name is an exact
+    phase label — far more reliable than guessing from copper centroids, which
+    on a fully-routed board don't separate into clean per-coil regions.
+    """
+    return {"A": 0, "B": 1, "C": 2}.get(name[:1].upper()) if name else None
+
+
 def _artwork_from_kicad(path: str | Path, design: MotorDesign) -> dict:
     """Parse the production ``.kicad_mod``: filled copper polys, pads, vias.
 
@@ -465,17 +476,22 @@ def _artwork_from_kicad(path: str | Path, design: MotorDesign) -> dict:
                 polys.append(_ring_pts(pts))
         if polys:
             pads.append({"name": name, "layer": layer, "pts": polys[0]})
-            pad_polys.extend((layer, p) for p in polys)
+            phase = _phase_of_pad(name)
+            pad_polys.extend((layer, p, phase) for p in polys)
 
     if not layers["F.Cu"] and not layers["B.Cu"] and pad_polys:
         # Routed-style board: ALL copper lives in net-bearing pads. Show it as
         # copper (per layer); the thru-hole markers below cover the terminals.
-        for layer, pts in pad_polys:
+        # Phase comes from the pad net name (exact), not the centroid (which on
+        # routed copper does not resolve into clean per-coil sectors).
+        for layer, pts, phase in pad_polys:
             key = "F.Cu" if layer == "F" else "B.Cu"
             cx = sum(p[0] for p in pts) / len(pts)
             cy = sum(p[1] for p in pts) / len(pts)
-            layers[key].append(
-                {"tooth": _tooth_of(cx, cy, n_slots), "pts": pts})
+            poly = {"tooth": _tooth_of(cx, cy, n_slots), "pts": pts}
+            if phase is not None:
+                poly["phase"] = phase
+            layers[key].append(poly)
         pads = []
 
     vias = [[round(float(a), 3), round(-float(b), 3)]
