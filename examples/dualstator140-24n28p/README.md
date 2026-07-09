@@ -5,8 +5,11 @@ general, or is it secretly tuned for the dualstator90-12n14p board it was built 
 
 To test that honestly, a **fresh agent** — given only an application brief, this repo,
 and the `pcb-motor-design` skill, and *none* of the authoring context — drove the entire
-workflow itself. Nobody hand-edited its design to make it work. What's here is what it
-produced.
+workflow itself, in one shot, on the first run, with zero tool fixes. What's here is what
+it produced, **untouched except for one later change made at the maintainer's explicit
+request: a third magnet ring** (see "Maintainer enhancement" below). Everything else —
+the 24N28P winding, the board, the Gerbers, the honest gate failure — is exactly the
+agent's one-shot output.
 
 ## The brief it was given
 
@@ -27,14 +30,17 @@ produced.
 
 ## Maintainer enhancement — a third magnet ring
 
-The agent shipped a **two-ring** rotor (that is what the eval recorded). Afterwards, as a
-generic tool capability, this repo grew a `round3` topology (a middle ring of discs per
-pole). Dropping a third ring of Ø8 mm N52 discs at r = 48 mm — into the empty radial gap
-between the agent's inner (Ø8 @ 40 mm) and outer (Ø12 @ 58 mm) rings, still inside the
-copper annulus — lifts continuous torque **+35.6%** (142 → **192 mN·m**, Kt 97 → **132
-mN·m/A**) for the same winding, current and copper. This is a *documented change to the
-artifact*, not part of the blind eval; the two-ring numbers above are what the agent
-produced on its own.
+The agent shipped a **two-ring** rotor (that is what the eval recorded). Afterwards, at
+the maintainer's explicit request, this repo grew a general `round3` topology (a middle
+ring of discs per pole) and applied it here — **the single deviation from the agent's
+one-shot design.** Dropping a third ring of **Ø6 mm** N52 discs at r = 48 mm — into the empty radial
+gap between the agent's inner (Ø8 @ 40 mm) and outer (Ø12 @ 58 mm) rings, still inside the
+copper annulus — lifts continuous torque **+21.8%** (142 → **173 mN·m**, Kt 97 → **118
+mN·m/A**) for the same winding, current and copper. Ø6 is the largest disc that keeps the
+required **≥1 mm of carrier on both radial sides** (the engine now warns below that). This
+is a *documented change to the artifact*, not part of the blind eval; the two-ring numbers
+above are what the agent produced on its own. (Note: the agent's inner ring sits at
+0.98 mm pole-to-pole — essentially 1 mm, and the tool flags it rather than hiding it.)
 
 ## What it delivered (all PASS)
 
@@ -47,9 +53,9 @@ produced on its own.
 | Datasheet / design | `datasheet.md`, `motor.json`, `requirements.yaml` |
 
 Headline numbers (analytical, **±30%** — calibrate against FEMM / a bench coil before
-spending money), **with the three-ring rotor**: **Kt ≈ 132 mNm/A, ~192 mNm continuous**
+spending money), **with the three-ring rotor**: **Kt ≈ 118 mNm/A, ~173 mNm continuous**
 at 1.46 A / 6.0 Ω, drive voltage 11.6 V (comfortable under the 24 V bus), kw1 0.9374,
-airgap |Bz| ≈ 0.13 T. (The agent's original two-ring rotor: Kt ≈ 97 mNm/A, ~142 mNm,
+airgap |Bz| ≈ 0.12 T. (The agent's original two-ring rotor: Kt ≈ 97 mNm/A, ~142 mNm,
 |Bz| ≈ 0.10 T.)
 
 ## The honest verdict

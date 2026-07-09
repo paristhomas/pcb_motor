@@ -34,9 +34,10 @@ skipped with an actionable message. All non-Gerber code is testable without KiCa
 
 ## Honest limits to preserve
 
-- gimbal90 (`examples/gimbal90/`) is the fabricated board; `build_routed_project`
-  reproduces it **coordinate-identically** — don't perturb `pcb_motor/kicad/routed.py`
-  or that guarantee (`tests/test_board_fabequiv.py` pins it).
+- `examples/dualstator90-12n14p/` (shipped as *gimbal90*) is the fabricated board;
+  `build_routed_project` reproduces it **coordinate-identically** — don't perturb
+  `pcb_motor/kicad/routed.py` or that guarantee (`tests/test_board_fabequiv.py` pins it).
+  Its `fabricated/` golden files keep their as-built `gimbal90_routed_tabs` names.
 - The general board path (`build_board`) leaves the cross-ring phase interconnect as a
   **ratsnest** for a human to route in KiCad; the coil copper is netless graphic
   (manufacturable, not connectivity-DRC-clean). State this; don't claim otherwise.

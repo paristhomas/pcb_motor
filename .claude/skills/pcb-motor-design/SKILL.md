@@ -103,11 +103,13 @@ If the user's magnet stock is off-the-shelf round discs (it usually is), set
 `outer_ring_r_m`/`outer_disc_d_m` (outer disc ring centre radius / disc diameter)
 and `inner_ring_r_m`/`inner_disc_d_m` (inner ring). Each pole is one outer + one
 inner disc, same polarity. In round mode `pole_coverage` / `magnet_r_inner_m` /
-`magnet_r_outer_m` are inert (arc-only) — don't sweep them. Check buildability:
-adjacent discs must not overlap, and the printed carrier needs a real wall between
-pockets (~0.8 mm FDM, ~0.3 mm resin — or open-walled pockets, where inter-disc
-repulsion holds each disc against its rim); the model will happily reward a 0.16 mm
-paper wall, so you must catch it.
+`magnet_r_outer_m` are inert (arc-only) — don't sweep them. To fill the empty radial
+band between the two rings (idle current-carrying copper), use `magnet_topology=round3`
+with a middle ring (`mid_ring_r_m` / `mid_disc_d_m`) — it can add real torque.
+Buildability: adjacent discs need a real carrier wall between them — the engine now
+**warns when any two discs are <1 mm apart** (pole-to-pole *and* ring-to-ring), so watch
+for that warning and shrink disc diameter / spread the rings / drop poles to clear it.
+The model will happily reward a 0.16 mm paper wall, so don't ignore the warning.
 
 Read the headline metrics back against the user's targets — call out where it's
 short or over.

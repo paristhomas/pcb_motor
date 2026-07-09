@@ -32,6 +32,30 @@ def test_round_two_ring_structure():
             assert np.hypot(cx, cy) == pytest.approx(ring_r, rel=1e-3)
 
 
+def test_magnet_edge_gaps():
+    from pcb_motor.magnets import magnet_edge_gaps
+    # arc topology has no discrete discs
+    assert magnet_edge_gaps(RotorConfig(magnet_topology="arc")) is None
+    # round3 with generous spacing: outer 58/Ø12, mid 48/Ø6, inner 40/Ø8, 28 poles
+    r = RotorConfig(magnet_topology="round3", pole_pairs=14,
+                    outer_ring_r_m=58e-3, outer_disc_d_m=12e-3,
+                    mid_ring_r_m=48e-3, mid_disc_d_m=6e-3,
+                    inner_ring_r_m=40e-3, inner_disc_d_m=8e-3)
+    g = magnet_edge_gaps(r)
+    # radial: (48-40)-(3+4)=1.0mm ; (58-48)-(6+4)... =(10)-(9)=1.0mm
+    assert g["radial_m"] == pytest.approx([1e-3, 1e-3], abs=1e-6)
+    # min is the tight inner pole-to-pole gap (~0.98mm), and it's the overall min
+    assert g["min_m"] == pytest.approx(min(g["circumferential_m"] + g["radial_m"]))
+    # widening the disc shrinks every gap
+    g2 = magnet_edge_gaps(dataclasses_replace(r, mid_disc_d_m=8e-3))
+    assert min(g2["radial_m"]) < min(g["radial_m"])
+
+
+def dataclasses_replace(obj, **kw):
+    import dataclasses
+    return dataclasses.replace(obj, **kw)
+
+
 def test_round3_three_ring_structure():
     """round3: 3 discs (outer+middle+inner) per pole, all sharing that pole's
     polarity; disc centres sit on the three ring radii, outer>mid>inner."""
