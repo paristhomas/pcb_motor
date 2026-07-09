@@ -145,6 +145,28 @@ def active_rings(rotor: RotorConfig) -> list[tuple[float, float]]:
     return [outer, inner]
 
 
+def magnet_edge_gaps(rotor: RotorConfig) -> dict | None:
+    """Edge-to-edge spacing [m] between neighbouring disc magnets on a round
+    rotor (``None`` for the ``arc`` topology, which has no discrete discs).
+
+    Two ways discs crowd their neighbours, both needing carrier/housing between
+    them: **circumferential** (pole-to-pole on one ring) and **radial**
+    (ring-to-ring). Returns per-ring circumferential gaps, ring-to-ring radial
+    gaps, and the tightest of all. Manufacturability wants >= ~1 mm everywhere.
+    """
+    if not is_round(rotor.magnet_topology):
+        return None
+    rings = active_rings(rotor)                      # (ring_r, disc_d), outer..inner
+    n_poles = 2 * rotor.pole_pairs
+    circ = [2.0 * np.pi * rr / n_poles - dd for rr, dd in rings]
+    rs = sorted(rings, key=lambda x: x[0])           # inner..outer by radius
+    radial = [(r2 - r1) - (d1 / 2.0 + d2 / 2.0)
+              for (r1, d1), (r2, d2) in zip(rs, rs[1:])]
+    allgaps = circ + radial
+    return {"circumferential_m": circ, "radial_m": radial,
+            "min_m": min(allgaps) if allgaps else float("inf")}
+
+
 def _round_two_ring_loops(
     rotor: RotorConfig,
     theta_rad: float = 0.0,

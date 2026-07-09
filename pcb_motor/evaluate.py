@@ -28,6 +28,11 @@ from .inertia import rotor_inertia, total_inertia
 # hot spot even when the lumped thermal balance is satisfied.
 NECK_DENSITY_LIMIT_A_MM2 = 80.0
 
+# Minimum carrier/housing between neighbouring disc magnets [m]. Round-magnet
+# rotors need material between discs (both pole-to-pole and ring-to-ring) to hold
+# them; below this the rotor is not practically buildable.
+MIN_MAGNET_GAP_M = 1.0e-3
+
 
 def evaluate_design(design: MotorDesign) -> dict:
     """Evaluate one design point. Returns the full result-variable dict."""
@@ -114,6 +119,21 @@ def evaluate_design(design: MotorDesign) -> dict:
             f"narrowest section exceeds ~{NECK_DENSITY_LIMIT_A_MM2:.0f} A/mm^2: "
             "expect a hot neck at r_inner -- widen trace_width_m, add copper "
             "weight, or move r_inner_m outward."
+        )
+
+    # Disc-magnet spacing: round rotors need carrier/housing between magnets.
+    from .magnets import magnet_edge_gaps
+    gaps = magnet_edge_gaps(design.rotor())
+    if gaps is not None and gaps["min_m"] < MIN_MAGNET_GAP_M:
+        circ = min(gaps["circumferential_m"]) * 1e3
+        detail = f"min pole-to-pole {circ:.2f} mm"
+        if gaps["radial_m"]:
+            detail += f", min ring-to-ring {min(gaps['radial_m'])*1e3:.2f} mm"
+        warnings.append(
+            f"disc magnets are only {gaps['min_m']*1e3:.2f} mm apart at the "
+            f"tightest point ({detail}); keep >= {MIN_MAGNET_GAP_M*1e3:.0f} mm of "
+            "carrier between magnets -- shrink disc diameter, spread the ring "
+            "radii, or drop the pole count."
         )
 
     if design.rotor_sides == 2:

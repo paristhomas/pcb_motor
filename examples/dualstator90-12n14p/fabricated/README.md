@@ -7,7 +7,7 @@ as the golden reference:
 - `gimbal90_routed_tabs.kicad_pcb` / `.kicad_pro` — the KiCad board sent to fab.
 - `gimbal90_routed_TABS_gerbers.zip` — the Gerber set that was ordered.
 
-**What this proves.** `pcb-motor board --session gimbal90 --gerbers` regenerates
+**What this proves.** `pcb-motor board --session dualstator90-12n14p --gerbers` regenerates
 this board from the committed routed footprint and exports its Gerbers. The
 regenerated `.kicad_pcb` is **coordinate-for-coordinate identical** to this one
 (same 17,665 copper/edge points, same bore, same placement), and Gerbers plotted

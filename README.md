@@ -128,10 +128,10 @@ Rounding out the CLI: `config` (setup figure), `showcase` (the shareable single-
 story page — see below), `compare` (sessions side by side), and `sweep` / `optimize`
 (interactive dashboards and optuna, with the `[sweep]` extra).
 
-Here's a 36-slot / 42-pole demo winding the engine generated, and the Biot–Savart field
-its rotor puts through the stator plane:
+Here's the fabricated 12N14P winding the engine generated, and the Biot–Savart field its
+rotor puts through the stator plane:
 
-![36N42P coil layout](docs/images/coil_layout.png)
+![12N14P coil layout](docs/images/coil_layout_12n14p.png)
 
 ![Airgap B_z field at the stator plane](docs/images/b_field.png)
 
@@ -158,29 +158,33 @@ its rotor puts through the stator plane:
   worst-case PWM current ripple (`v_bus / (4·L·f_pwm)`) and the external inductance
   needed to hit your ripple budget. Most small PCB motors need that choke.
 
-## Worked examples
+## The main event: the board that was fabricated
 
-[`examples/dualstator80-36n42p/`](examples/dualstator80-36n42p/) is a complete design session, committed
-as-is: an 80 mm, 42-pole dual-stator pancake built from off-the-shelf round disc magnets
-(42× Ø5 mm + 42× Ø4 mm N52), on two ordinary 2-layer 1 oz JLC boards. The tool's verdict:
-**Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at just under 1 A and 3 Ω**, with an honest
-note the brief didn't ask for: *driving it choke-free from an ODrive is infeasible by
-32×; budget ~204 µH of external inductance per phase.* The directory has the
-requirements, the saved design, the datasheet, the clearance-verified footprint, the
-KiCad project, and a README telling the whole story — including where the tool says no.
+[`examples/dualstator90-12n14p/`](examples/dualstator90-12n14p/) (shipped as *gimbal90*) is
+a real 90 mm 12N14P dual-stator stator that was **actually fabricated** — this is the
+board the whole repo exists to reproduce. It is a fully-routed board (every coil link, WYE
+star and phase lead baked into copper), with back iron, M3 mounting tabs and PTH terminals.
+`pcb-motor board --session dualstator90-12n14p --gerbers` regenerates it and plots its
+Gerbers; the regenerated board is coordinate-for-coordinate identical to the manufactured
+one in [`examples/dualstator90-12n14p/fabricated/`](examples/dualstator90-12n14p/fabricated/)
+and the Gerbers match it layer-for-layer (see `tests/test_board_fabequiv.py`).
 
-The best way to meet a design is the **showcase report** — one self-contained HTML page
-from `pcb-motor showcase`: the rotor spinning over the real copper with the Biot–Savart
-field, the zoomable board artwork with its real outline and mounting tabs, the exploded
-stack, the trace-width trade charts, and the drive-gate verdict in large print.
+The best way to meet it is the **showcase report** — one self-contained HTML page from
+`pcb-motor showcase`: the rotor spinning over the real copper with the Biot–Savart field,
+the zoomable board artwork with its real outline and mounting tabs, the exploded stack, the
+trace-width trade charts, and the drive-gate verdict in large print.
 
-[`examples/dualstator90-12n14p/`](examples/dualstator90-12n14p/) is a real 90 mm stator that was **actually
-fabricated**: a fully-routed board (every coil link, WYE star and phase lead baked into
-copper), M3 mounting tabs and PTH terminals. `pcb-motor board --session dualstator90-12n14p
---gerbers` regenerates it and plots its Gerbers; the regenerated board is
-coordinate-for-coordinate identical to the manufactured one in
-[`examples/dualstator90-12n14p/fabricated/`](examples/dualstator90-12n14p/fabricated/) and the Gerbers match it
-layer-for-layer (see `tests/test_board_fabequiv.py`).
+## Generalization evals (proof it isn't over-fit to that one board)
+
+Two further sessions exist only to show the same concept→board→Gerber workflow holds for
+*different* machines, driven the same way:
+
+- [`examples/dualstator80-36n42p/`](examples/dualstator80-36n42p/) — an 80 mm, 42-pole
+  dual-stator pancake (off-the-shelf round disc magnets). The tool's honest verdict:
+  **20.5 mNm continuous (±30%)**, and *driving it choke-free from an ODrive is infeasible by
+  32× — budget ~204 µH per phase.* It reports the "no" instead of hiding it.
+- [`examples/dualstator140-24n28p/`](examples/dualstator140-24n28p/) — a 140 mm 24N28P
+  machine an **independent agent** designed end-to-end from only a brief and the skill.
 
 ## The physics, honestly
 
