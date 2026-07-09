@@ -196,9 +196,21 @@
       p.closePath();
       return p;
     }
-    var teeth = {};                            // tooth -> [Path2D]
-    DATA.artwork.fcu.forEach(function (poly) {
-      (teeth[poly.tooth] = teeth[poly.tooth] || []).push(toPath2D(poly.pts));
+    // Each copper poly with the phase it belongs to. Prefer an explicit per-poly
+    // phase (routed boards label every bit of copper by net name); otherwise map
+    // the geometric tooth through the winding layout (clean one-coil-per-tooth
+    // boards). On a clean board the front layer already carries all coils, so we
+    // draw front only; a routed board splits copper across both layers, so we add
+    // the back layer too (its pads are phase-named, hence reliable) for full,
+    // correctly-coloured coverage.
+    function coilPath(poly) {
+      var phase = (poly.phase != null) ? poly.phase
+        : (DATA.layout[poly.tooth] || { phase: poly.tooth % 3 }).phase;
+      return { path: toPath2D(poly.pts), phase: phase };
+    }
+    var coilPaths = DATA.artwork.fcu.map(coilPath);
+    (DATA.artwork.bcu || []).forEach(function (poly) {
+      if (poly.phase != null) coilPaths.push(coilPath(poly));
     });
     var padPaths = DATA.artwork.pads.map(function (p) { return toPath2D(p.pts); });
 
@@ -226,16 +238,15 @@
         ctx.restore();
       }
 
-      // copper, tinted by instantaneous phase current
+      // copper, tinted by instantaneous phase current (hue = phase, opacity =
+      // |current|; the current sign only reverses direction, not brightness)
       var I = phaseCurrents(anim.theta * p);
-      for (var k = 0; k < DATA.meta.slots; k++) {
-        var lay = DATA.layout[k] || { phase: k % 3, sign: 1 };
-        var cur = I[lay.phase] * lay.sign;
-        var rgb = seriesRgb[lay.phase];
-        var a = 0.12 + 0.72 * Math.abs(cur);
+      coilPaths.forEach(function (c) {
+        var rgb = seriesRgb[c.phase];
+        var a = 0.12 + 0.72 * Math.abs(I[c.phase]);
         ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + a.toFixed(3) + ")";
-        (teeth[k] || []).forEach(function (path) { ctx.fill(path); });
-      }
+        ctx.fill(c.path);
+      });
       ctx.fillStyle = T.pad;
       padPaths.forEach(function (path) { ctx.fill(path); });
 
