@@ -1,4 +1,4 @@
-# camslider140 — requirements captured from the application brief
+# dualstator140-24n28p — requirements captured from the application brief
 application: >-
   Pancake BLDC for a lightweight camera slider / pan-head DIRECT DRIVE.
   Coreless axial-flux, dual-stator sandwiching a single rotor disc.

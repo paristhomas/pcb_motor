@@ -96,7 +96,7 @@ default and meaning). Choose the annulus from the envelope, and a
   torque despite the higher pole count. On larger boards (≳120 mm) don't assume the
   biggest combo wins — evaluate 12N14P / 24N28P / 36N42P for the actual envelope and
   compare `tau_cont_mNm` and end-turn loss. (An independent 140 mm eval found 24N28P
-  beat 36N42P for exactly this reason — see `examples/camslider140/`.)
+  beat 36N42P for exactly this reason — see `examples/dualstator140-24n28p/`.)
 
 If the user's magnet stock is off-the-shelf round discs (it usually is), set
 `magnet_topology=round` and describe the rotor with the four round fields:
@@ -205,7 +205,7 @@ Markdown datasheet.
 `.kicad_pcb` and, with `--gerbers`, plots the fab-ready Gerber + Excellon-drill zip
 via `kicad-cli`. Output lands in `designs/<name>/kicad_board/` (or
 `kicad_routed_tabs/` for a session shipping a verbatim routed footprint, e.g.
-gimbal90). Python API:
+dualstator90-12n14p). Python API:
 
   ```python
   from pcb_motor.kicad import build_board, export_gerbers

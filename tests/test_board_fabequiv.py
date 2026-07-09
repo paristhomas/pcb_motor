@@ -1,6 +1,6 @@
 """gimbal90 fab-equivalence: `build_routed_project` from the committed routed
 footprint must reproduce the board that was actually fabricated
-(`examples/gimbal90/fabricated/`), coordinate-for-coordinate.
+(`examples/dualstator90-12n14p/fabricated/`), coordinate-for-coordinate.
 
 This is the deterministic half of the check (no KiCad needed). The Gerber half
 -- that kicad-cli plots byte-identical layers from the two boards -- is verified
@@ -17,7 +17,7 @@ from pcb_motor.kicad import build_routed_project
 from pcb_motor.kicad.routed import RoutedError
 
 REPO = Path(__file__).resolve().parent.parent
-EX = REPO / "examples" / "gimbal90"
+EX = REPO / "examples" / "dualstator90-12n14p"
 GOLDEN = EX / "fabricated" / "gimbal90_routed_tabs.kicad_pcb"
 MOD = EX / "stator_routed_2side_tabs.kicad_mod"
 
@@ -29,7 +29,7 @@ def _xy(text: str):
 @pytest.mark.skipif(not (GOLDEN.exists() and MOD.exists()),
                     reason="gimbal90 golden reference / routed footprint absent")
 def test_regenerated_board_matches_fabricated(tmp_path):
-    design = sessions.Session("gimbal90", root=str(REPO / "examples")).load_motor()
+    design = sessions.Session("dualstator90-12n14p", root=str(REPO / "examples")).load_motor()
     try:
         rep = build_routed_project(design, str(tmp_path), tabs=True,
                                    mod_path=str(MOD),

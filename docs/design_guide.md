@@ -111,7 +111,7 @@ Four fields describe it (defaults in parentheses):
 | `inner_ring_r_m` | 20.6 mm | Centre radius of the inner disc ring. |
 | `inner_disc_d_m` | 8 mm | Inner disc diameter (default fits stock Ø8). |
 
-Worked example — the rotor of the committed [`examples/odrive80`](../examples/odrive80/README.md)
+Worked example — the rotor of the committed [`examples/dualstator80-36n42p`](../examples/dualstator80-36n42p/README.md)
 design, 42× Ø5×3 mm N52 outer + 42× Ø4×3 mm N52 inner discs (42 poles = one disc
 pair per pole), tried here against our running session:
 
@@ -523,9 +523,9 @@ Two things to know:
   final interconnect routing is the one manual step this workflow leaves to you.
 
 The exception is a session that ships a **verbatim routed footprint** (e.g. the
-committed `gimbal90`): there `board` rebuilds the fully-routed board — every coil link,
+committed `dualstator90-12n14p`): there `board` rebuilds the fully-routed board — every coil link,
 WYE star and phase lead already copper — coordinate-for-coordinate identical to the board
-that was actually fabricated (`examples/gimbal90/fabricated/`), and its Gerbers match
+that was actually fabricated (`examples/dualstator90-12n14p/fabricated/`), and its Gerbers match
 layer-for-layer. That is the reference the general path is measured against.
 
 ## Stage 7 — Fab and build notes

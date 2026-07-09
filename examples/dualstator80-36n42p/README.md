@@ -1,4 +1,4 @@
-# odrive80 — an 80 mm no-choke attempt, honestly lost
+# dualstator80-36n42p — an 80 mm no-choke attempt, honestly lost
 
 This directory is a complete, committed design session: what the tool was asked for,
 what it designed, and what it said about the result — including the part the brief
@@ -36,7 +36,7 @@ was doing nothing but adding resistance.
 Inductance grows ~N² while torque-per-ohm falls, so we swept trace width both ways
 ([`compare.md`](compare.md) has the head-to-head):
 
-| | `odrive80` (0.50 mm traces) | `odrive80-maxL` (0.127 mm traces) |
+| | `dualstator80-36n42p` (0.50 mm traces) | `dualstator80-36n42p-maxL` (0.127 mm traces) |
 |---|---|---|
 | Kt | 20.75 mNm/A | 48.97 mNm/A |
 | Continuous torque | **20.52 mNm** | 16.15 mNm |
@@ -54,7 +54,7 @@ The saved design ([`motor.json`](motor.json), full numbers in
 [`datasheet.md`](datasheet.md)): **Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at
 0.99 A**, R 3.0 Ω and L 6.7 µH (totals for both boards in series), kw1 0.943,
 3.9 V drive voltage at continuous current. And the verdict, verbatim from
-`pcb-motor point --session odrive80` at the most favorable ODrive operating point
+`pcb-motor point --session dualstator80-36n42p` at the most favorable ODrive operating point
 (12 V bus, 48 kHz PWM — i.e. an ODrive Pro/S1; a stock v3.6 at 24 kHz doubles the
 ripple):
 
@@ -89,17 +89,17 @@ three chokes:
 - [`setup.png`](setup.png) — winding, rotor, and axial stack figure.
 - [`compare.md`](compare.md) — the trace-width trade study above.
 
-![The odrive80 winding, rotor and stack](setup.png)
+![The dualstator80-36n42p winding, rotor and stack](setup.png)
 
 ## Reproduce / iterate it
 
 Sessions live under `designs/` (gitignored working area). To pick this design up:
 
 ```bash
-mkdir -p designs/odrive80
-cp examples/odrive80/motor.json examples/odrive80/requirements.yaml designs/odrive80/
-.venv/bin/pcb-motor point --session odrive80          # re-evaluate (~30-60 s)
-.venv/bin/pcb-motor footprint --session odrive80 --project   # rebuild the KiCad artifacts
+mkdir -p designs/dualstator80-36n42p
+cp examples/dualstator80-36n42p/motor.json examples/dualstator80-36n42p/requirements.yaml designs/dualstator80-36n42p/
+.venv/bin/pcb-motor point --session dualstator80-36n42p          # re-evaluate (~30-60 s)
+.venv/bin/pcb-motor footprint --session dualstator80-36n42p --project   # rebuild the KiCad artifacts
 ```
 
 Every number above is the analytical model talking. Before spending real money:

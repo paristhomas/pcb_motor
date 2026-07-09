@@ -224,8 +224,8 @@ def test_narrative_overrides_only_named_sections(default_design,
 
 
 def test_kicad_artwork_parser_on_committed_footprint():
-    """The odrive80 example's production footprint parses into real polygons."""
-    root = Path(__file__).resolve().parents[1] / "examples" / "odrive80"
+    """The dualstator80-36n42p example's production footprint parses into real polygons."""
+    root = Path(__file__).resolve().parents[1] / "examples" / "dualstator80-36n42p"
     mod = root / "stator_full_2side.kicad_mod"
     if not mod.exists():
         pytest.skip("example footprint not present")

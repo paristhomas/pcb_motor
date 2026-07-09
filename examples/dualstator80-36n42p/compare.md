@@ -1,4 +1,4 @@
-| Parameter | odrive80 | odrive80-maxL |
+| Parameter | dualstator80-36n42p | dualstator80-36n42p-maxL |
 | --- | --- | --- |
 | Winding | concentrated, 36N42P, 3-phase, 1 parallel path(s) | concentrated, 36N42P, 3-phase, 1 parallel path(s) |
 | Magnets | N52, round, 21 pole-pairs, 3.0 mm, 85% coverage | N52, round, 21 pole-pairs, 3.0 mm, 85% coverage |

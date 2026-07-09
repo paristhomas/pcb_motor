@@ -1,7 +1,7 @@
-# camslider140 — the generalization eval (designed by an independent agent)
+# dualstator140-24n28p — the generalization eval (designed by an independent agent)
 
 This design exists to answer one question: **is the `pcb_motor` workflow actually
-general, or is it secretly tuned for the gimbal90 board it was built around?**
+general, or is it secretly tuned for the dualstator90-12n14p board it was built around?**
 
 To test that honestly, a **fresh agent** — given only an application brief, this repo,
 and the `pcb-motor-design` skill, and *none* of the authoring context — drove the entire
@@ -18,12 +18,23 @@ produced.
 ## What the agent chose (and why)
 
 - **24N28P** (24 slots, 14 pole-pairs), verified **kw1 = 0.9374** — a genuinely different
-  machine from gimbal90 (12N14P, 90 mm). It compared three pole counts head-to-head and
+  machine from dualstator90-12n14p (12N14P, 90 mm). It compared three pole counts head-to-head and
   found that with *round-disc* magnets the largest combo (36N42P) is actually the worst,
   because disc packing forces smaller magnets and collapses the airgap field — the round
   magnet constraint inverts the usual "more poles → more torque" intuition.
 - **134 mm copper OD** (138 mm board edge, inside the 140 mm limit), 60 mm bore, N52 discs
-  in two concentric rings, tapered-wedge traces, 0.6 mm neck / 0.127 mm space.
+  in **two concentric rings**, tapered-wedge traces, 0.6 mm neck / 0.127 mm space.
+
+## Maintainer enhancement — a third magnet ring
+
+The agent shipped a **two-ring** rotor (that is what the eval recorded). Afterwards, as a
+generic tool capability, this repo grew a `round3` topology (a middle ring of discs per
+pole). Dropping a third ring of Ø8 mm N52 discs at r = 48 mm — into the empty radial gap
+between the agent's inner (Ø8 @ 40 mm) and outer (Ø12 @ 58 mm) rings, still inside the
+copper annulus — lifts continuous torque **+35.6%** (142 → **192 mN·m**, Kt 97 → **132
+mN·m/A**) for the same winding, current and copper. This is a *documented change to the
+artifact*, not part of the blind eval; the two-ring numbers above are what the agent
+produced on its own.
 
 ## What it delivered (all PASS)
 
@@ -36,8 +47,10 @@ produced.
 | Datasheet / design | `datasheet.md`, `motor.json`, `requirements.yaml` |
 
 Headline numbers (analytical, **±30%** — calibrate against FEMM / a bench coil before
-spending money): **Kt ≈ 97 mNm/A, ~142 mNm continuous** at 1.46 A / 6.0 Ω, drive voltage
-11.6 V (comfortable under the 24 V bus), kw1 0.9374, airgap |Bz| ≈ 0.10 T.
+spending money), **with the three-ring rotor**: **Kt ≈ 132 mNm/A, ~192 mNm continuous**
+at 1.46 A / 6.0 Ω, drive voltage 11.6 V (comfortable under the 24 V bus), kw1 0.9374,
+airgap |Bz| ≈ 0.13 T. (The agent's original two-ring rotor: Kt ≈ 97 mNm/A, ~142 mNm,
+|Bz| ≈ 0.10 T.)
 
 ## The honest verdict
 

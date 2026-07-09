@@ -16,18 +16,26 @@ emits production KiCad footprints with net-bearing terminal pads, a board genera
 wraps them into a complete `.kicad_pcb`, and a `kicad-cli` step that plots fab-ready
 Gerbers.
 
-## Driving it with Claude
+## Start here: drive it with an LLM agent
 
-The repo ships a Claude skill (`.claude/skills/pcb-motor-design`), so you can open
-[Claude Code](https://claude.com/claude-code) in the repo and describe what you want:
+**The intended way to use this repo is to point a coding agent at it and talk to it in
+plain language — not to memorize the CLI.** The repo ships a Claude skill
+(`.claude/skills/pcb-motor-design`) that turns your requirements into a finished design.
+
+1. Install [Claude Code](https://claude.com/claude-code): `npm i -g @anthropic-ai/claude-code`
+   (or use any LLM coding agent — Cursor, the Claude/ChatGPT desktop apps with repo access, etc.).
+2. Clone this repo and do the [one-time install](#install) below (`.venv` + `pip install -e .`).
+3. From the repo root, launch the agent (`claude`) and just describe the motor you want:
 
 > "design me a pancake motor for a camera gimbal, about 50 mNm continuous, 80 mm max
 > diameter, 24 V bus"
 
-It captures the requirements, seeds a design, iterates it against your envelope, runs
-the feasibility gates, and produces the KiCad files, Gerbers, and an HTML report. That
-is the intended workflow. [docs/design_guide.md](docs/design_guide.md) is the full
-stage-by-stage walkthrough; the rest of this README is the short version.
+The skill auto-loads and the agent captures the requirements, seeds a design, iterates it
+against your envelope, runs the feasibility gates, and produces the KiCad files, Gerbers,
+and an HTML report — asking you to confirm along the way. You never have to learn the
+commands yourself; the agent runs them. [docs/design_guide.md](docs/design_guide.md) is
+the full stage-by-stage walkthrough; the rest of this README is the short version for
+when you *do* want to drive the CLI by hand.
 
 ## Install
 
@@ -138,7 +146,8 @@ its rotor puts through the stator plane:
 - **A complete KiCad board** — `pcb_motor.kicad.build_board` wraps the footprint in a
   full `.kicad_pcb` (board outline, bore, mounting holes, WYE nets bound to the terminal
   pads), alongside the symbol library and pre-wired 3-phase schematic from
-  `build_kicad_project`. gimbal90 additionally ships a verbatim fully-routed board.
+  `build_kicad_project`. The fabricated board (dualstator90-12n14p) additionally ships a
+  verbatim fully-routed board.
 - **Fab-ready Gerbers** — `pcb_motor.kicad.export_gerbers` runs `kicad-cli` to plot the
   standard 2-layer set (copper, mask, silkscreen, paste, edge cuts) plus an Excellon
   drill file, and zips it for upload.
@@ -151,7 +160,7 @@ its rotor puts through the stator plane:
 
 ## Worked examples
 
-[`examples/odrive80/`](examples/odrive80/) is a complete design session, committed
+[`examples/dualstator80-36n42p/`](examples/dualstator80-36n42p/) is a complete design session, committed
 as-is: an 80 mm, 42-pole dual-stator pancake built from off-the-shelf round disc magnets
 (42× Ø5 mm + 42× Ø4 mm N52), on two ordinary 2-layer 1 oz JLC boards. The tool's verdict:
 **Kt 20.75 mNm/A, 20.5 mNm continuous (±30%) at just under 1 A and 3 Ω**, with an honest
@@ -165,12 +174,12 @@ from `pcb-motor showcase`: the rotor spinning over the real copper with the Biot
 field, the zoomable board artwork with its real outline and mounting tabs, the exploded
 stack, the trace-width trade charts, and the drive-gate verdict in large print.
 
-[`examples/gimbal90/`](examples/gimbal90/) is a real 90 mm stator that was **actually
+[`examples/dualstator90-12n14p/`](examples/dualstator90-12n14p/) is a real 90 mm stator that was **actually
 fabricated**: a fully-routed board (every coil link, WYE star and phase lead baked into
-copper), M3 mounting tabs and PTH terminals. `pcb-motor board --session gimbal90
+copper), M3 mounting tabs and PTH terminals. `pcb-motor board --session dualstator90-12n14p
 --gerbers` regenerates it and plots its Gerbers; the regenerated board is
 coordinate-for-coordinate identical to the manufactured one in
-[`examples/gimbal90/fabricated/`](examples/gimbal90/fabricated/) and the Gerbers match it
+[`examples/dualstator90-12n14p/fabricated/`](examples/dualstator90-12n14p/fabricated/) and the Gerbers match it
 layer-for-layer (see `tests/test_board_fabequiv.py`).
 
 ## The physics, honestly

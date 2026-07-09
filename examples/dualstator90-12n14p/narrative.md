@@ -1,9 +1,10 @@
 ## The board this repo was built to reproduce
 
-gimbal90 is not a synthetic demo — it is a real, shipped 90 mm gimbal-motor
-stator that was designed, hand-tuned and ordered as Gerbers before this repo
-existed. It's a 12-coil / 14-pole (12N14P) dual-stator machine: two of these
-boards sandwich one magnet rotor, wired in series.
+dualstator90-12n14p (shipped under the working name *gimbal90*) is not a
+synthetic demo — it is a real, shipped 90 mm gimbal-motor stator that was
+designed, hand-tuned and ordered as Gerbers before this repo existed. It's a
+12-coil / 14-pole (12N14P) dual-stator machine: two of these boards sandwich one
+magnet rotor, wired in series, with a mild-steel back-iron plate behind each.
 
 What makes it the reference example is the **fully-routed artwork**: every
 coil-to-coil link, the WYE star and the phase leads are baked into the

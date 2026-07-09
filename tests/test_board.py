@@ -1,6 +1,6 @@
 """General board path (board.py): wrap a filled-copper footprint into a
 complete, manufacturable .kicad_pcb with the WYE terminals net-bound and the
-cross-ring interconnect left as ratsnest. Uses odrive80's committed 36-slot
+cross-ring interconnect left as ratsnest. Uses dualstator80-36n42p's committed 36-slot
 footprint via footprint_path, so the test skips the slow footprint build."""
 
 from pathlib import Path
@@ -13,13 +13,13 @@ from pcb_motor.kicad.board import BoardError
 from pcb_motor.kicad.project import _Plan
 
 REPO = Path(__file__).resolve().parent.parent
-EX = REPO / "examples" / "odrive80"
+EX = REPO / "examples" / "dualstator80-36n42p"
 FP = EX / "stator_full_2side.kicad_mod"
 
 
-@pytest.mark.skipif(not FP.exists(), reason="odrive80 committed footprint absent")
+@pytest.mark.skipif(not FP.exists(), reason="dualstator80-36n42p committed footprint absent")
 def test_general_board_36slot(tmp_path):
-    design = sessions.Session("odrive80", root=str(REPO / "examples")).load_motor()
+    design = sessions.Session("dualstator80-36n42p", root=str(REPO / "examples")).load_motor()
     rep = build_board(design, str(tmp_path), footprint_path=str(FP))
 
     assert rep.passed
@@ -47,11 +47,11 @@ def test_general_board_36slot(tmp_path):
     assert b"\r\n" in raw and b"\r\r\n" not in raw
 
 
-@pytest.mark.skipif(not FP.exists(), reason="odrive80 committed footprint absent")
+@pytest.mark.skipif(not FP.exists(), reason="dualstator80-36n42p committed footprint absent")
 def test_terminal_pads_carry_nets_stitch_vias_do_not(tmp_path):
     from pcb_motor.kicad.board import _pad_spans
 
-    design = sessions.Session("odrive80", root=str(REPO / "examples")).load_motor()
+    design = sessions.Session("dualstator80-36n42p", root=str(REPO / "examples")).load_motor()
     rep = build_board(design, str(tmp_path), footprint_path=str(FP))
     txt = Path(rep.pcb_path).read_text(encoding="utf-8")
 
