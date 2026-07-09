@@ -1,6 +1,6 @@
 # pcb_motor
 
-**Design a motor whose stator is a printed circuit board.**
+**Design coreless axial-flux PCB motors — concept to fab-ready Gerbers.**
 
 A coreless axial-flux motor where the stator is a PCB: copper spirals replace wound
 wire, the board house replaces the winding shop, and the rotor is disc magnets glued to

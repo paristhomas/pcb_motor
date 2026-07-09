@@ -30,8 +30,10 @@ NECK_DENSITY_LIMIT_A_MM2 = 80.0
 
 # Minimum carrier/housing between neighbouring disc magnets [m]. Round-magnet
 # rotors need material between discs (both pole-to-pole and ring-to-ring) to hold
-# them; below this the rotor is not practically buildable.
-MIN_MAGNET_GAP_M = 1.0e-3
+# them; below this the rotor is not practically buildable. 0.8 mm is a workable
+# floor for a printed/machined carrier web (the fabricated gimbal runs tighter
+# still, at ~0.3 mm, with open-walled pockets).
+MIN_MAGNET_GAP_M = 0.8e-3
 
 
 def evaluate_design(design: MotorDesign) -> dict:

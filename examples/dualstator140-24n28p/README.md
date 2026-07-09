@@ -33,14 +33,14 @@ agent's one-shot output.
 The agent shipped a **two-ring** rotor (that is what the eval recorded). Afterwards, at
 the maintainer's explicit request, this repo grew a general `round3` topology (a middle
 ring of discs per pole) and applied it here — **the single deviation from the agent's
-one-shot design.** Dropping a third ring of **Ø6 mm** N52 discs at r = 48 mm — into the empty radial
-gap between the agent's inner (Ø8 @ 40 mm) and outer (Ø12 @ 58 mm) rings, still inside the
-copper annulus — lifts continuous torque **+21.8%** (142 → **173 mN·m**, Kt 97 → **118
-mN·m/A**) for the same winding, current and copper. Ø6 is the largest disc that keeps the
-required **≥1 mm of carrier on both radial sides** (the engine now warns below that). This
-is a *documented change to the artifact*, not part of the blind eval; the two-ring numbers
-above are what the agent produced on its own. (Note: the agent's inner ring sits at
-0.98 mm pole-to-pole — essentially 1 mm, and the tool flags it rather than hiding it.)
+one-shot design.** The three rings step **up in size going outward** — inner **Ø8 @ 40 mm**,
+middle **Ø9 @ 49.5 mm**, outer **Ø12 @ 61 mm** (the outer ring nudged out from the agent's
+58 mm to make room, its edge now at the 67 mm coil OD). Filling the previously-empty middle
+band — full of current-carrying copper but no field — lifts continuous torque **+32.6%**
+(142 → **188 mN·m**, Kt 97 → **129 mN·m/A**) for the same winding, current and copper. Every
+disc keeps **≥0.8 mm of carrier** to its neighbours (tightest is the inner ring at 0.98 mm
+pole-to-pole; the engine warns below 0.8 mm). This is a *documented change to the artifact*,
+not part of the blind eval; the two-ring numbers above are what the agent produced on its own.
 
 ## What it delivered (all PASS)
 
@@ -53,9 +53,9 @@ above are what the agent produced on its own. (Note: the agent's inner ring sits
 | Datasheet / design | `datasheet.md`, `motor.json`, `requirements.yaml` |
 
 Headline numbers (analytical, **±30%** — calibrate against FEMM / a bench coil before
-spending money), **with the three-ring rotor**: **Kt ≈ 118 mNm/A, ~173 mNm continuous**
+spending money), **with the three-ring rotor**: **Kt ≈ 129 mNm/A, ~188 mNm continuous**
 at 1.46 A / 6.0 Ω, drive voltage 11.6 V (comfortable under the 24 V bus), kw1 0.9374,
-airgap |Bz| ≈ 0.12 T. (The agent's original two-ring rotor: Kt ≈ 97 mNm/A, ~142 mNm,
+airgap |Bz| ≈ 0.13 T. (The agent's original two-ring rotor: Kt ≈ 97 mNm/A, ~142 mNm,
 |Bz| ≈ 0.10 T.)
 
 ## The honest verdict
