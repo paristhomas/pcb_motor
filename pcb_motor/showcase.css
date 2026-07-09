@@ -27,6 +27,8 @@
   --copper-back: #7d8fb5;
   --fr4: #3d6b4f;
   --pad: #d4a017;
+  --iron: #8a8f96;       /* back-iron / mild-steel return plate */
+  --iron-hi: #b9bec6;
   --accent: #2a78d6;
 }
 @media (prefers-color-scheme: dark) {
@@ -51,6 +53,8 @@
     --copper-back: #8fa3cc;
     --fr4: #35594a;
     --pad: #e0b23a;
+    --iron: #6f747b;
+    --iron-hi: #9aa0a8;
     --accent: #3987e5;
   }
 }

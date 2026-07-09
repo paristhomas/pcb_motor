@@ -32,6 +32,25 @@ def test_round_two_ring_structure():
             assert np.hypot(cx, cy) == pytest.approx(ring_r, rel=1e-3)
 
 
+def test_round3_three_ring_structure():
+    """round3: 3 discs (outer+middle+inner) per pole, all sharing that pole's
+    polarity; disc centres sit on the three ring radii, outer>mid>inner."""
+    rotor = RotorConfig(magnet_topology="round3", pole_pairs=7,
+                        outer_ring_r_m=58e-3, mid_ring_r_m=48e-3, inner_ring_r_m=40e-3)
+    loops = _round_two_ring_loops(rotor)
+    n_poles = 2 * rotor.pole_pairs
+    assert len(loops) == 3 * n_poles              # outer + mid + inner per pole
+
+    radii = (rotor.outer_ring_r_m, rotor.mid_ring_r_m, rotor.inner_ring_r_m)
+    for k in range(n_poles):
+        signs = [loops[3 * k + j][1] for j in range(3)]
+        assert len(set(np.sign(signs))) == 1      # all three share this pole's sign
+        for j, ring_r in enumerate(radii):
+            verts = loops[3 * k + j][0][:-1]
+            cx, cy = verts[:, 0].mean(), verts[:, 1].mean()
+            assert np.hypot(cx, cy) == pytest.approx(ring_r, rel=1e-3)
+
+
 def _net_current(verts: np.ndarray, i_signed: float) -> float:
     """A closed perimeter loop carries one signed current; just return it."""
     return i_signed

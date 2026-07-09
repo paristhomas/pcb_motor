@@ -145,12 +145,14 @@ class RotorConfig:
     carrier_thickness_m: float = 1.5e-3
     # Rotor magnet shape: "arc" (continuous pole-arc ring, parametrised by
     # magnet_r_inner/outer + pole_coverage); "round" (two concentric rings of
-    # round disc magnets -- inner+outer of each pole share polarity); or the
-    # single-ring study variants "round_outer" (outer ring only) / "round_inner"
-    # (inner ring only).
+    # round disc magnets -- inner+outer of each pole share polarity); "round3"
+    # (three rings -- inner+mid+outer per pole); or the single-ring study
+    # variants "round_outer" (outer ring only) / "round_inner" (inner ring only).
     magnet_topology: str = "arc"
     outer_ring_r_m: float = 37.2e-3    # round: outer-disc centre radius
     outer_disc_d_m: float = 15.0e-3    # round: outer-disc diameter (stock Ø15)
+    mid_ring_r_m: float = 29.0e-3      # round3: middle-disc centre radius
+    mid_disc_d_m: float = 10.0e-3      # round3: middle-disc diameter (stock Ø10)
     inner_ring_r_m: float = 20.6e-3    # round: inner-disc centre radius
     inner_disc_d_m: float = 8.0e-3     # round: inner-disc diameter (stock Ø8)
 
@@ -208,9 +210,11 @@ class MotorDesign:
                                        # between two magnet rotors); requires
                                        # n_stators == 1 and back_iron False
     carrier_thickness_m: float = 1.5e-3
-    magnet_topology: str = "arc"       # arc | round | round_outer | round_inner
+    magnet_topology: str = "arc"       # arc | round | round3 | round_outer | round_inner
     outer_ring_r_m: float = 37.2e-3
     outer_disc_d_m: float = 15.0e-3
+    mid_ring_r_m: float = 29.0e-3
+    mid_disc_d_m: float = 10.0e-3
     inner_ring_r_m: float = 20.6e-3
     inner_disc_d_m: float = 8.0e-3
 
@@ -250,6 +254,8 @@ class MotorDesign:
             magnet_topology=self.magnet_topology,
             outer_ring_r_m=self.outer_ring_r_m,
             outer_disc_d_m=self.outer_disc_d_m,
+            mid_ring_r_m=self.mid_ring_r_m,
+            mid_disc_d_m=self.mid_disc_d_m,
             inner_ring_r_m=self.inner_ring_r_m,
             inner_disc_d_m=self.inner_disc_d_m,
         )

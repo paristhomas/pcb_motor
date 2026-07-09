@@ -113,7 +113,7 @@ def _magnet_loops(
     return loops
 
 
-ROUND_TOPOLOGIES = ("round", "round_outer", "round_inner")
+ROUND_TOPOLOGIES = ("round", "round3", "round_outer", "round_inner")
 
 
 def is_round(topology: str) -> bool:
@@ -124,7 +124,8 @@ def is_round(topology: str) -> bool:
 def active_rings(rotor: RotorConfig) -> list[tuple[float, float]]:
     """``(ring_radius_m, disc_diameter_m)`` pairs present for this round rotor.
 
-    - ``round``        -- both rings (outer larger discs + inner smaller discs).
+    - ``round``        -- two rings (outer larger discs + inner smaller discs).
+    - ``round3``       -- three rings (outer + middle + inner discs per pole).
     - ``round_outer``  -- outer ring only (inner ring removed).
     - ``round_inner``  -- inner ring only (outer ring removed).
 
@@ -133,11 +134,14 @@ def active_rings(rotor: RotorConfig) -> list[tuple[float, float]]:
     off the same list, so geometry stays self-consistent.
     """
     outer = (rotor.outer_ring_r_m, rotor.outer_disc_d_m)
+    mid = (rotor.mid_ring_r_m, rotor.mid_disc_d_m)
     inner = (rotor.inner_ring_r_m, rotor.inner_disc_d_m)
     if rotor.magnet_topology == "round_outer":
         return [outer]
     if rotor.magnet_topology == "round_inner":
         return [inner]
+    if rotor.magnet_topology == "round3":
+        return [outer, mid, inner]
     return [outer, inner]
 
 

@@ -658,6 +658,18 @@ def _stack_payload(design: MotorDesign) -> dict:
         return {"kind": "gap", "label": label or f"air gap {gap:g} mm",
                 "z": _sig(z, 4), "t": _sig(gap, 3), "od": _sig(board_od, 4)}
 
+    # Back iron: a flat return plate flush on the *outboard* face of each stator
+    # board (away from the rotor). The physics models it as an ideal mu->inf
+    # plane, so its thickness is not a design variable; we draw a representative
+    # 1 mm mild-steel plate purely so the reader can see it is (or is not) there.
+    t_iron = 1.0
+    stand = design.iron_standoff_m * 1e3
+
+    def iron(z, label):
+        return {"kind": "iron", "label": label, "z": _sig(z, 4), "t": _sig(t_iron, 3),
+                "od": _sig(board_od, 4),
+                "note": "≈1 mm mild-steel return plate (fixed; modelled as an ideal plane)"}
+
     items: list[dict]
     if design.rotor_sides == 2:
         z2 = 2 * rotor.stator_z_m() * 1e3
@@ -670,12 +682,21 @@ def _stack_payload(design: MotorDesign) -> dict:
         items = [board(zs, "stator board (top)"), air((zs - t_b / 2 + t_m / 2) / 2),
                  rotor_item(0.0, "rotor"), air(-(zs - t_b / 2 + t_m / 2) / 2),
                  board(-zs, "stator board (bottom)")]
+        if design.back_iron:
+            zi = zs + t_b / 2 + stand + t_iron / 2
+            items = ([iron(zi, "back iron (top)")] + items
+                     + [iron(-zi, "back iron (bottom)")])
     else:
         items = [board(zs, "stator board"), air((zs - t_b / 2 + t_m / 2) / 2),
                  rotor_item(0.0, "rotor")]
+        if design.back_iron:
+            zi = zs + t_b / 2 + stand + t_iron / 2
+            items = [iron(zi, "back iron")] + items
     total = (max(it["z"] + it["t"] / 2 for it in items)
              - min(it["z"] - it["t"] / 2 for it in items))
-    return {"items": items, "gap_mm": _sig(gap, 3), "total_mm": _sig(total, 4)}
+    n_iron = sum(1 for it in items if it["kind"] == "iron")
+    return {"items": items, "gap_mm": _sig(gap, 3), "total_mm": _sig(total, 4),
+            "back_iron": bool(design.back_iron), "n_iron": n_iron}
 
 
 # --------------------------------------------------------------------------- #
@@ -1123,6 +1144,14 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     brief = _section("brief", "stage 1", "The brief", prose["brief"], req_html)
 
     # ---- architecture (winding ring + exploded stack) -----------------------
+    if design.back_iron:
+        _n_iron = payload["stack"].get("n_iron", 0)
+        iron_note = (f"<strong>Back iron: yes</strong> — {_n_iron} mild-steel return "
+                     f"plate{'s' if _n_iron != 1 else ''} (grey, hatched) flush behind "
+                     f"the stator{'s' if _n_iron != 1 else ''}.")
+    else:
+        iron_note = ("<strong>Back iron: none</strong> — fully coreless; the only "
+                     "solids are FR4, copper and the magnet rotor.")
     arch_body = f"""
 <div class="duo">
   <figure class="panel">
@@ -1136,7 +1165,7 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     <div class="stack-controls"><label>explode
       <input type="range" id="explode" min="0" max="1" step="0.01" value="0"></label></div>
     <figcaption>The axial sandwich, to scale from the design dimensions.
-    Drag the slider (or just scroll past) to pull it apart.</figcaption>
+    Drag the slider (or just scroll past) to pull it apart. {iron_note}</figcaption>
   </figure>
 </div>"""
     architecture = _section("architecture", "the machine", "Architecture",
