@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "pcb_motor_coil")(type "KiCad")(uri "${KIPRJMOD}/pcb_motor_coil.kicad_sym")(options "")(descr "PCB-motor stator + coil"))
+)

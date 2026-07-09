@@ -212,8 +212,8 @@ def _auto_narrative(design: MotorDesign, results: dict, gate: dict,
                if design.n_stators == 2 else
                f"{design.n_stators} stator board(s) face the rotor across a "
                f"{design.air_gap_m*1e3:.1f} mm air gap.")
-            + " There is no iron: no cogging, no saturation, and honestly not much "
-              "inductance either -- that bill arrives in the drive section."),
+            + " There is no iron: no cogging, no saturation, and little "
+              "inductance -- that constraint surfaces in the drive section."),
         "board": _md_to_html(
             "The actual copper. Scroll to zoom, drag to pan, toggle layers. "
             "The back layer mirrors the front about each coil's centre-line so the "
@@ -658,6 +658,18 @@ def _stack_payload(design: MotorDesign) -> dict:
         return {"kind": "gap", "label": label or f"air gap {gap:g} mm",
                 "z": _sig(z, 4), "t": _sig(gap, 3), "od": _sig(board_od, 4)}
 
+    # Back iron: a flat return plate flush on the *outboard* face of each stator
+    # board (away from the rotor). The physics models it as an ideal mu->inf
+    # plane, so its thickness is not a design variable; we draw a representative
+    # 1 mm mild-steel plate purely so the reader can see it is (or is not) there.
+    t_iron = 1.0
+    stand = design.iron_standoff_m * 1e3
+
+    def iron(z, label):
+        return {"kind": "iron", "label": label, "z": _sig(z, 4), "t": _sig(t_iron, 3),
+                "od": _sig(board_od, 4),
+                "note": "≈1 mm mild-steel return plate (fixed; modelled as an ideal plane)"}
+
     items: list[dict]
     if design.rotor_sides == 2:
         z2 = 2 * rotor.stator_z_m() * 1e3
@@ -670,12 +682,21 @@ def _stack_payload(design: MotorDesign) -> dict:
         items = [board(zs, "stator board (top)"), air((zs - t_b / 2 + t_m / 2) / 2),
                  rotor_item(0.0, "rotor"), air(-(zs - t_b / 2 + t_m / 2) / 2),
                  board(-zs, "stator board (bottom)")]
+        if design.back_iron:
+            zi = zs + t_b / 2 + stand + t_iron / 2
+            items = ([iron(zi, "back iron (top)")] + items
+                     + [iron(-zi, "back iron (bottom)")])
     else:
         items = [board(zs, "stator board"), air((zs - t_b / 2 + t_m / 2) / 2),
                  rotor_item(0.0, "rotor")]
+        if design.back_iron:
+            zi = zs + t_b / 2 + stand + t_iron / 2
+            items = [iron(zi, "back iron")] + items
     total = (max(it["z"] + it["t"] / 2 for it in items)
              - min(it["z"] - it["t"] / 2 for it in items))
-    return {"items": items, "gap_mm": _sig(gap, 3), "total_mm": _sig(total, 4)}
+    n_iron = sum(1 for it in items if it["kind"] == "iron")
+    return {"items": items, "gap_mm": _sig(gap, 3), "total_mm": _sig(total, 4),
+            "back_iron": bool(design.back_iron), "n_iron": n_iron}
 
 
 # --------------------------------------------------------------------------- #
@@ -881,9 +902,15 @@ def _resolve_artwork(design: MotorDesign, session, artwork_mod,
     if artwork_mod is not None:
         art_path = Path(artwork_mod)
     elif session is not None:
-        cand = session.dir / "stator_full_2side.kicad_mod"
-        if cand.exists():
-            art_path = cand
+        # committed production copper: the general filled-copper footprint, or a
+        # verbatim routed footprint (gimbal90) -- both are real board copper.
+        for cand_name in ("stator_full_2side.kicad_mod",
+                          "stator_routed_2side_tabs.kicad_mod",
+                          "stator_routed_2side.kicad_mod"):
+            cand = session.dir / cand_name
+            if cand.exists():
+                art_path = cand
+                break
 
     reason = None
     if art_path is None and auto_footprint:
@@ -924,6 +951,43 @@ def _resolve_artwork(design: MotorDesign, session, artwork_mod,
     return artwork, notice
 
 
+def _circle_poly(r: float, n: int = 128) -> list:
+    """Closed circle as a y-up polyline (mm), for a plain board edge / bore."""
+    return [[round(r * math.cos(2 * math.pi * k / n), 3),
+             round(r * math.sin(2 * math.pi * k / n), 3)] for k in range(n)]
+
+
+def _board_outline(design: MotorDesign, session) -> list:
+    """Board Edge.Cuts outline(s) as closed y-up polylines (mm), ~centred.
+
+    Prefers a committed ``tabs_outline.json`` next to the session -- the exact
+    routed-board edge, mounting tabs and all -- so the viewer shows the real
+    board shape. Otherwise a plain circular edge derived from the design. The
+    winding inner bore is added as a second ring. Concentric with the copper,
+    which is likewise centred, so the two overlay.
+    """
+    import json
+
+    polys = []
+    tabs = None
+    if session is not None:
+        cand = session.dir / "tabs_outline.json"
+        if cand.exists():
+            try:
+                tabs = json.loads(cand.read_text(encoding="utf-8"))["outline_mm"]
+            except Exception:
+                tabs = None
+    if tabs:
+        # KiCad Edge.Cuts is y-down; flip to y-up to match the copper frame.
+        polys.append([[round(float(x), 3), round(-float(y), 3)] for x, y in tabs])
+    else:
+        polys.append(_circle_poly(design.r_outer_m * 1e3 + 2.0))
+    bore = design.r_inner_m * 1e3
+    if bore > 1.0:
+        polys.append(_circle_poly(bore))
+    return polys
+
+
 # --------------------------------------------------------------------------- #
 # Payload assembly
 # --------------------------------------------------------------------------- #
@@ -950,6 +1014,7 @@ def _collect_payload(design: MotorDesign, *, session=None, name=None,
     # that announces itself.
     artwork, _art_notice = _resolve_artwork(design, session, artwork_mod,
                                             auto_footprint)
+    artwork["outline"] = _board_outline(design, session)
 
     geo = build_coil(design)
     i_cont = float(results["i_cont_A"]) or 1.0
@@ -1079,6 +1144,14 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     brief = _section("brief", "stage 1", "The brief", prose["brief"], req_html)
 
     # ---- architecture (winding ring + exploded stack) -----------------------
+    if design.back_iron:
+        _n_iron = payload["stack"].get("n_iron", 0)
+        iron_note = (f"<strong>Back iron: yes</strong> — {_n_iron} mild-steel return "
+                     f"plate{'s' if _n_iron != 1 else ''} (grey, hatched) flush behind "
+                     f"the stator{'s' if _n_iron != 1 else ''}.")
+    else:
+        iron_note = ("<strong>Back iron: none</strong> — fully coreless; the only "
+                     "solids are FR4, copper and the magnet rotor.")
     arch_body = f"""
 <div class="duo">
   <figure class="panel">
@@ -1092,7 +1165,7 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     <div class="stack-controls"><label>explode
       <input type="range" id="explode" min="0" max="1" step="0.01" value="0"></label></div>
     <figcaption>The axial sandwich, to scale from the design dimensions.
-    Drag the slider (or just scroll past) to pull it apart.</figcaption>
+    Drag the slider (or just scroll past) to pull it apart. {iron_note}</figcaption>
   </figure>
 </div>"""
     architecture = _section("architecture", "the machine", "Architecture",
@@ -1243,7 +1316,7 @@ def render_showcase(design: MotorDesign, *, session=None, name=None,
     honesty = f"""
 <section id="verdict">
   <div class="kicker">the fine print</div>
-  <h2>Verdict, honestly</h2>
+  <h2>Verdict</h2>
   <div class="prose">{prose['verdict']}</div>
   <div class="honesty panel">
     <p><strong>Model honesty:</strong> this is an analytical, feasibility-grade

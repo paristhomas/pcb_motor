@@ -1,4 +1,4 @@
-# odrive80 — an 80 mm no-choke attempt, honestly lost
+# dualstator80-36n42p — an 80 mm no-choke attempt, honestly lost
 
 ## hero
 An 80 mm pancake designed to a hard brief: maximize continuous torque on an

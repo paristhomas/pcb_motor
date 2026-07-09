@@ -31,6 +31,7 @@
       pos: cssVar("--div-pos"), neg: cssVar("--div-neg"),
       copper: cssVar("--copper"), copperBack: cssVar("--copper-back"),
       fr4: cssVar("--fr4"), pad: cssVar("--pad"), accent: cssVar("--accent"),
+      iron: cssVar("--iron"), ironHi: cssVar("--iron-hi"),
       good: cssVar("--good"), critical: cssVar("--critical")
     };
   }
@@ -148,6 +149,11 @@
     var m = DATA.meta.od_mm / 2;
     DATA.artwork.pads.forEach(function (p) {
       p.pts.forEach(function (q) {
+        m = Math.max(m, Math.abs(q[0]), Math.abs(q[1]));
+      });
+    });
+    (DATA.artwork.outline || []).forEach(function (poly) {
+      poly.forEach(function (q) {
         m = Math.max(m, Math.abs(q[0]), Math.abs(q[1]));
       });
     });
@@ -363,12 +369,27 @@
       role: "img", "aria-label": "interactive board copper artwork"
     }, host);
 
-    // board outline
+    // board outline: real Edge.Cuts (board edge + mounting tabs + bore) when
+    // available, else a plain circle from the design diameter.
     var gBoard = svgEl("g", {}, svg);
-    svgEl("circle", {
-      cx: 0, cy: 0, r: DATA.meta.od_mm / 2, fill: T.surface,
-      stroke: T.baseline, "stroke-width": 0.25
-    }, gBoard);
+    var outline = DATA.artwork.outline;
+    if (outline && outline.length) {
+      svgEl("path", {                                  // board body (first ring)
+        d: ringPath(outline[0]), fill: T.surface,
+        stroke: T.baseline, "stroke-width": 0.3
+      }, gBoard);
+      for (var oi = 1; oi < outline.length; oi++) {    // bore / cut-outs
+        svgEl("path", {
+          d: ringPath(outline[oi]), fill: T.page,
+          stroke: T.baseline, "stroke-width": 0.3
+        }, gBoard);
+      }
+    } else {
+      svgEl("circle", {
+        cx: 0, cy: 0, r: DATA.meta.od_mm / 2, fill: T.surface,
+        stroke: T.baseline, "stroke-width": 0.25
+      }, gBoard);
+    }
     svgEl("path", {
       d: "M-1.2 0H1.2M0 -1.2V1.2", stroke: T.muted, "stroke-width": 0.12
     }, gBoard);
@@ -572,6 +593,15 @@
     var maxH = layout(1).height;
     svg.setAttribute("viewBox", "0 0 " + W + " " + maxH);
 
+    // diagonal hatch so the mild-steel back-iron plates read as metal, not FR4
+    var defs = svgEl("defs", {}, svg);
+    var pat = svgEl("pattern", {
+      id: "iron-hatch", width: 5, height: 5,
+      patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)"
+    }, defs);
+    svgEl("rect", { width: 5, height: 5, fill: T.ironHi }, pat);
+    svgEl("line", { x1: 0, y1: 0, x2: 0, y2: 5, stroke: T.iron, "stroke-width": 1.6 }, pat);
+
     var gAxis = svgEl("g", {}, svg);
     var g = svgEl("g", {}, svg);
 
@@ -580,6 +610,104 @@
       return "M" + (cx - r) + " " + yTop + " L" + (cx - r) + " " + (yTop + h) +
         " A" + r + " " + ry + " 0 0 0 " + (cx + r) + " " + (yTop + h) +
         " L" + (cx + r) + " " + yTop;
+    }
+
+    function magFill(m) { return m.pol > 0 ? T.pos : T.neg; }
+
+    // one disk body (side wall + top face + any per-kind detail on the top face)
+    function drawBody(row, cx, e) {
+      var it = row.it, r = it.od / 2 * pxmm, yTop = row.yTop, h = row.h;
+      var yMid = yTop + h / 2;
+      if (it.kind === "gap") {
+        // dimension bracket for the air gap (fades in as the stack explodes)
+        var gvis = Math.max(0, Math.min(1, (e - 0.12) * 2.2));
+        svgEl("line", {
+          x1: cx - r * 0.55, y1: yMid, x2: cx + r * 0.55, y2: yMid,
+          stroke: T.muted, "stroke-width": 1, "stroke-dasharray": "2.5 3.5",
+          opacity: 0.9 * gvis
+        }, g);
+        var gt = svgEl("text", {
+          x: cx + r * 0.58, y: yMid + 3.5, "font-size": 11, fill: T.muted,
+          "font-family": "system-ui, sans-serif", opacity: gvis
+        }, g);
+        gt.textContent = it.label;
+        return;
+      }
+      // side wall: FR4 green, iron grey, rotor carrier dark
+      var wall = it.kind === "board" ? T.fr4 : it.kind === "iron" ? T.iron : T.baseline;
+      svgEl("path", {
+        d: diskPath(cx, yTop, h, r), fill: wall, stroke: T.border,
+        "stroke-width": 0.6
+      }, g);
+      // top face
+      var topFill = it.kind === "board" ? T.fr4
+        : it.kind === "iron" ? "url(#iron-hatch)" : T.surface;
+      svgEl("ellipse", {
+        cx: cx, cy: yTop, rx: r, ry: r * K,
+        fill: topFill, stroke: T.border, "stroke-width": 0.6
+      }, g);
+      if (it.kind === "board" && it.copper) {
+        var co = it.copper[1] * pxmm, ci = it.copper[0] * pxmm;
+        svgEl("path", {
+          d: "M" + (cx - co) + " " + yTop +
+            "A" + co + " " + co * K + " 0 1 0 " + (cx + co) + " " + yTop +
+            "A" + co + " " + co * K + " 0 1 0 " + (cx - co) + " " + yTop + "Z" +
+            "M" + (cx - ci) + " " + yTop +
+            "A" + ci + " " + ci * K + " 0 1 0 " + (cx + ci) + " " + yTop +
+            "A" + ci + " " + ci * K + " 0 1 0 " + (cx - ci) + " " + yTop + "Z",
+          fill: T.copper, "fill-rule": "evenodd"
+        }, g);
+      }
+      if (it.kind === "rotor" && it.mag) {
+        // draw far magnets first so near ones overlap them (painter's order)
+        var items2 = DATA.magnets.items.slice()
+          .sort(function (a, b) { return magY(a) - magY(b); });
+        function magY(m) {
+          var y0 = m.kind === "circle" ? m.cy : m.pts[0][1];
+          return -y0;
+        }
+        items2.forEach(function (m) {
+          var mx, my, mr;
+          if (m.kind === "circle") { mx = m.cx; my = m.cy; mr = m.r; }
+          else {
+            var xs = m.pts.map(function (q) { return q[0]; });
+            var ys = m.pts.map(function (q) { return q[1]; });
+            mx = xs.reduce(function (a, b) { return a + b; }) / xs.length;
+            my = ys.reduce(function (a, b) { return a + b; }) / ys.length;
+            mr = (it.mag[1] - it.mag[0]) / 2 * 0.7;
+          }
+          svgEl("ellipse", {
+            cx: cx + mx * pxmm, cy: yTop - my * pxmm * K,
+            rx: mr * pxmm, ry: mr * pxmm * K,
+            fill: magFill(m), "fill-opacity": 0.92,
+            stroke: T.surface, "stroke-width": 0.4
+          }, g);
+        });
+      }
+    }
+
+    // leader line + label text, always painted on top of every body. Labels
+    // fade in with the explode so they don't pile up while the stack is closed.
+    function drawLabel(row, cx, e) {
+      var it = row.it, r = it.od / 2 * pxmm, yMid = row.yTop + row.h / 2;
+      if (it.kind === "gap") return;          // gaps label themselves in drawBody
+      var vis = Math.max(0, Math.min(1, (e - 0.1) * 3));
+      if (vis <= 0) return;
+      var lx = cx + r + 14;
+      svgEl("line", {
+        x1: cx + r * 0.99, y1: yMid, x2: lx - 4, y2: yMid,
+        stroke: T.muted, "stroke-width": 1, opacity: vis
+      }, g);
+      var t1 = svgEl("text", {
+        x: lx, y: yMid, "font-size": 12.5, fill: T.ink, "font-weight": 600,
+        "font-family": "system-ui, sans-serif", opacity: vis
+      }, g);
+      t1.textContent = it.label;
+      var t2 = svgEl("text", {
+        x: lx, y: yMid + 14, "font-size": 10.5, fill: T.muted,
+        "font-family": "system-ui, sans-serif", opacity: vis
+      }, g);
+      t2.textContent = it.note || "";
     }
 
     function render(e) {
@@ -592,90 +720,15 @@
         stroke: T.muted, "stroke-width": 1, "stroke-dasharray": "5 5", opacity: 0.6
       }, gAxis);
 
-      L.rows.forEach(function (row) {
-        var it = row.it, r = it.od / 2 * pxmm, yTop = row.yTop, h = row.h;
-        var yMid = yTop + h / 2;
-        if (it.kind === "gap") {
-          // dimension bracket for the air gap (fades in as the stack explodes)
-          var gvis = Math.max(0, Math.min(1, (e - 0.12) * 2.2));
-          svgEl("line", {
-            x1: cx - r * 0.55, y1: yMid, x2: cx + r * 0.55, y2: yMid,
-            stroke: T.muted, "stroke-width": 1, "stroke-dasharray": "2.5 3.5",
-            opacity: 0.9 * gvis
-          }, g);
-          var gt = svgEl("text", {
-            x: cx + r * 0.58, y: yMid + 3.5, "font-size": 11, fill: T.muted,
-            "font-family": "system-ui, sans-serif", opacity: gvis
-          }, g);
-          gt.textContent = it.label;
-          return;
-        }
-        var body = it.kind === "board" ? T.fr4 : T.baseline;
-        svgEl("path", {
-          d: diskPath(cx, yTop, h, r), fill: body, stroke: T.border,
-          "stroke-width": 0.5, "fill-opacity": 0.92
-        }, g);
-        svgEl("ellipse", {
-          cx: cx, cy: yTop, rx: r, ry: r * K,
-          fill: it.kind === "board" ? T.fr4 : T.surface,
-          stroke: T.border, "stroke-width": 0.5
-        }, g);
-        if (it.kind === "board" && it.copper) {
-          var co = it.copper[1] * pxmm, ci = it.copper[0] * pxmm;
-          svgEl("path", {
-            d: "M" + (cx - co) + " " + yTop +
-              "A" + co + " " + co * K + " 0 1 0 " + (cx + co) + " " + yTop +
-              "A" + co + " " + co * K + " 0 1 0 " + (cx - co) + " " + yTop + "Z" +
-              "M" + (cx - ci) + " " + yTop +
-              "A" + ci + " " + ci * K + " 0 1 0 " + (cx + ci) + " " + yTop +
-              "A" + ci + " " + ci * K + " 0 1 0 " + (cx - ci) + " " + yTop + "Z",
-            fill: T.copper, "fill-rule": "evenodd", "fill-opacity": 0.95
-          }, g);
-        }
-        if (it.kind === "rotor" && it.mag) {
-          var items2 = DATA.magnets.items.slice()
-            .sort(function (a, b) { return magY(a) - magY(b); });
-          function magY(m) {
-            var y0 = m.kind === "circle" ? m.cy : m.pts[0][1];
-            return -y0;
-          }
-          items2.forEach(function (m) {
-            var mx, my, mr;
-            if (m.kind === "circle") { mx = m.cx; my = m.cy; mr = m.r; }
-            else {
-              var xs = m.pts.map(function (q) { return q[0]; });
-              var ys = m.pts.map(function (q) { return q[1]; });
-              mx = xs.reduce(function (a, b) { return a + b; }) / xs.length;
-              my = ys.reduce(function (a, b) { return a + b; }) / ys.length;
-              mr = (it.mag[1] - it.mag[0]) / 2 * 0.7;
-            }
-            svgEl("ellipse", {
-              cx: cx + mx * pxmm, cy: yTop - my * pxmm * K,
-              rx: mr * pxmm, ry: mr * pxmm * K,
-              fill: m.pol > 0 ? T.pos : T.neg, "fill-opacity": 0.85,
-              stroke: T.surface, "stroke-width": 0.4
-            }, g);
-          });
-        }
-        // label + leader
-        var lx = cx + r + 14;
-        svgEl("line", {
-          x1: cx + r * 0.99, y1: yMid, x2: lx - 4, y2: yMid,
-          stroke: T.muted, "stroke-width": 1
-        }, g);
-        var t1 = svgEl("text", {
-          x: lx, y: yMid, "font-size": 12.5, fill: T.ink, "font-weight": 600,
-          "font-family": "system-ui, sans-serif"
-        }, g);
-        t1.textContent = it.label;
-        var t2 = svgEl("text", {
-          x: lx, y: yMid + 14, "font-size": 10.5, fill: T.muted,
-          "font-family": "system-ui, sans-serif"
-        }, g);
-        t2.textContent = it.note || "";
-      });
+      // Camera looks DOWN at the stack from above-front, so the TOP layer is
+      // nearest and must paint last (in front). Bodies bottom-to-top; labels
+      // (forward) go on top of everything.
+      for (var ri = L.rows.length - 1; ri >= 0; ri--) drawBody(L.rows[ri], cx, e);
+      L.rows.forEach(function (row) { drawLabel(row, cx, e); });
     }
 
+    // reduced-motion users get no auto-explode, so present it already opened up
+    if (REDUCED && !stackState.autoDone) { stackState.e = 0.85; stackState.autoDone = true; }
     render(stackState.e);
     if (slider) {
       slider.value = stackState.e;

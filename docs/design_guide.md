@@ -111,7 +111,7 @@ Four fields describe it (defaults in parentheses):
 | `inner_ring_r_m` | 20.6 mm | Centre radius of the inner disc ring. |
 | `inner_disc_d_m` | 8 mm | Inner disc diameter (default fits stock Ø8). |
 
-Worked example — the rotor of the committed [`examples/odrive80`](../examples/odrive80/README.md)
+Worked example — the rotor of the committed [`examples/dualstator80-36n42p`](../examples/dualstator80-36n42p/README.md)
 design, 42× Ø5×3 mm N52 outer + 42× Ø4×3 mm N52 inner discs (42 poles = one disc
 pair per pole), tried here against our running session:
 
@@ -491,6 +491,42 @@ Two practical notes from the trenches:
   pancake80 attempt at `r_inner_m=16e-3` failed loudly — `FootprintError: no stitch
   via fits between the innermost radials on both layers` — and moving to 18 mm fixed
   it. The builder refuses rather than emitting an unbuildable board; believe it.
+
+### Board + Gerbers: `pcb-motor board`
+
+The footprint and project are the pieces; `board` assembles the whole board and, with
+`--gerbers`, the fab package:
+
+```text
+pcb-motor board --session pancake80 --gerbers
+# board written to designs/pancake80/kicad_board (PASS)
+# SUMMARY: PASS  (12 files, zip pcb_motor_stator_gerbers.zip)  kicad-cli 9.0.7
+```
+
+`build_board(design, out_dir)` (in `pcb_motor.kicad`) wraps the filled-copper footprint
+in a complete `.kicad_pcb` — board outline, bore, mounting holes, and the WYE nets bound
+to the terminal pads — reusing the project scaffolding from `build_kicad_project`.
+`export_gerbers(pcb_path)` then runs `kicad-cli` to plot the standard 2-layer Gerber set
+(copper, mask, silkscreen, paste, edge cuts) plus an Excellon drill file and zips it.
+
+Two things to know:
+
+- **Gerbers need `kicad-cli` (KiCad ≥ 7)** on the machine — a native install, or a
+  Windows KiCad reachable from WSL (both auto-detected; or pass `--kicad-cli`). Without
+  it the `.kicad_pcb` is still written and the Gerber step is skipped with a clear
+  message; open the board in KiCad and File→Plot by hand.
+- **The general board leaves the phase interconnect as a ratsnest.** The coil copper is
+  netless graphic (it plots fine — the board is manufacturable — but KiCad can't trace a
+  coil end-to-end, so the board is not connectivity-DRC-clean), and only the
+  adjacent-coil series bridges are copper. The cross-ring joins that chain each phase are
+  declared as nets with no track copper: KiCad shows a ratsnest for you to route. That
+  final interconnect routing is the one manual step this workflow leaves to you.
+
+The exception is a session that ships a **verbatim routed footprint** (e.g. the
+committed `dualstator90-12n14p`): there `board` rebuilds the fully-routed board — every coil link,
+WYE star and phase lead already copper — coordinate-for-coordinate identical to the board
+that was actually fabricated (`examples/dualstator90-12n14p/fabricated/`), and its Gerbers match
+layer-for-layer. That is the reference the general path is measured against.
 
 ## Stage 7 — Fab and build notes
 

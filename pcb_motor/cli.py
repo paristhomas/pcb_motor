@@ -274,6 +274,21 @@ def main(argv=None) -> int:
                           "(default 0.2, production quality)")
     pfp.add_argument("--root", default="designs")
 
+    pbd = sub.add_parser(
+        "board",
+        help="build the full KiCad board (.kicad_pcb) for a session and, with "
+             "--gerbers, export a fab-ready gerber+drill zip")
+    pbd.add_argument("--session", required=True,
+                     help="session under designs/<name>/ to build the board for")
+    pbd.add_argument("--set", action="append", default=[], dest="sets",
+                     help="override a MotorDesign field for this build only")
+    pbd.add_argument("--gerbers", action="store_true",
+                     help="also export fab-ready gerbers+drill (zip) via kicad-cli")
+    pbd.add_argument("--kicad-cli", default=None, dest="kicad_cli",
+                     help="path to kicad-cli (default: auto-detect, including "
+                          "a Windows KiCad install reachable from WSL)")
+    pbd.add_argument("--root", default="designs")
+
     pr = sub.add_parser("report", help="write a combined HTML design report")
     pr.add_argument("--set", action="append", default=[], dest="sets")
     pr.add_argument("--session", help="load the design from designs/<name>/")
@@ -467,6 +482,75 @@ def main(argv=None) -> int:
             print(f"KiCad project written to {kdir} "
                   f"({'PASS' if prep.passed else 'FAIL'}, "
                   f"{len(prep.files)} files: {names})")
+        return 0
+
+    if args.cmd == "board":
+        import os
+        from . import session as sessions
+
+        s = sessions.Session(args.session, root=args.root)
+        if not s.exists():
+            raise SystemExit(
+                f"session {args.session!r} has no saved motor; "
+                f"run 'pcb-motor new --session {args.session}' first"
+            )
+        design = _apply_overrides(s.load_motor(), args.sets)
+
+        # A session that ships a verbatim routed footprint (gimbal90) rebuilds
+        # its exact board; everything else goes through the general board path.
+        routed_tabs = s.dir / "stator_routed_2side_tabs.kicad_mod"
+        routed_plain = s.dir / "stator_routed_2side.kicad_mod"
+        pcb_path = None
+        if routed_tabs.exists() or routed_plain.exists():
+            from .kicad import build_routed_project
+            from .kicad.routed import RoutedError
+            tabs = routed_tabs.exists()
+            mod = str(routed_tabs if tabs else routed_plain)
+            project = f"{s.name}_routed_tabs" if tabs else f"{s.name}_routed"
+            out_dir = s.dir / ("kicad_routed_tabs" if tabs else "kicad_routed")
+            try:
+                rep = build_routed_project(design, str(out_dir), tabs=tabs,
+                                           mod_path=mod, project=project)
+            except RoutedError as exc:
+                print(f"BOARD FAILED: {exc}", file=sys.stderr)
+                return 2
+            pcb_path = os.path.join(str(out_dir), f"{project}.kicad_pcb")
+            print(f"routed board written to {out_dir} "
+                  f"({'PASS' if rep.passed else 'FAIL'}, {len(rep.files)} files)")
+        else:
+            try:
+                from .kicad import build_board
+                from .kicad.board import BoardError
+            except ImportError:
+                print("general board path (board.py) is not available yet; "
+                      "this session has no committed routed footprint",
+                      file=sys.stderr)
+                return 2
+            kdir = s.dir / "kicad_board"
+            try:
+                rep = build_board(design, str(kdir))
+            except BoardError as exc:
+                print(f"BOARD FAILED: {exc}", file=sys.stderr)
+                return 2
+            pcb_path = rep.pcb_path
+            print(f"board written to {kdir} "
+                  f"({'PASS' if rep.passed else 'FAIL'})")
+
+        if args.gerbers and pcb_path:
+            from .kicad import GerberError, export_gerbers
+            from .kicad.gerbers import discover_kicad_cli
+            cli = args.kicad_cli or discover_kicad_cli()
+            if not cli:
+                print("GERBERS SKIPPED: no kicad-cli found (install KiCad or "
+                      "pass --kicad-cli); the .kicad_pcb is on disk to plot by "
+                      "hand.", file=sys.stderr)
+                return 0
+            try:
+                grep = export_gerbers(pcb_path, kicad_cli=cli)
+            except GerberError as exc:
+                print(f"GERBERS SKIPPED: {exc}", file=sys.stderr)
+                return 0
+            print(grep)
         return 0
 
     if args.cmd == "report":

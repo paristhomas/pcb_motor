@@ -83,12 +83,20 @@ default and meaning). Choose the annulus from the envelope, and a
 
 - **12N14P** (`n_slots=12, pole_pairs=7`) — the small-motor default, kw1≈0.94.
   The 12-slot table also serves 12N10P.
+- **24N28P** (`n_slots=24, pole_pairs=14`) — mid diameters (~100–130 mm OD),
+  kw1≈0.94; the 12N14P family tiled twice.
 - **36N42P** (`n_slots=36, pole_pairs=21`) — large diameters (~80–100 mm OD),
   kw1≈0.95, short end-turns.
 - Anything else falls back to a round-robin layout that can **silently give kw1≈0**
   (6N8P scores exactly 0.000). After ANY change to `n_slots`/`pole_pairs`, check the
   printed `Winding factor kw1` is ≥0.9; if not, say so and fix the combo before
   optimizing anything.
+- **With round-disc magnets, more poles is NOT always more torque.** More poles means
+  smaller discs to fit the pole pitch, which drops the airgap field and can *lose*
+  torque despite the higher pole count. On larger boards (≳120 mm) don't assume the
+  biggest combo wins — evaluate 12N14P / 24N28P / 36N42P for the actual envelope and
+  compare `tau_cont_mNm` and end-turn loss. (An independent 140 mm eval found 24N28P
+  beat 36N42P for exactly this reason — see `examples/dualstator140-24n28p/`.)
 
 If the user's magnet stock is off-the-shelf round discs (it usually is), set
 `magnet_topology=round` and describe the rotor with the four round fields:
@@ -191,6 +199,30 @@ Markdown datasheet.
   of the footprint into `kicad/pcb_motor.pretty/coil_full_2side.kicad_mod` (always
   that canonical name, whatever the source file was called) — the project reads the
   vendored copy, so regenerate the project if you regenerate the footprint.
+
+### Stage 7 — Board + Gerbers (fab-ready)
+`pcb-motor board --session <name> --gerbers` wraps the footprint in a complete
+`.kicad_pcb` and, with `--gerbers`, plots the fab-ready Gerber + Excellon-drill zip
+via `kicad-cli`. Output lands in `designs/<name>/kicad_board/` (or
+`kicad_routed_tabs/` for a session shipping a verbatim routed footprint, e.g.
+dualstator90-12n14p). Python API:
+
+  ```python
+  from pcb_motor.kicad import build_board, export_gerbers
+  rep = build_board(design, "designs/<name>/kicad_board")
+  grep = export_gerbers(rep.pcb_path)      # -> <name>_gerbers.zip
+  ```
+
+Two things to relay honestly to the user:
+- **kicad-cli is required for Gerbers** (KiCad ≥ 7 — a native install, or a Windows
+  KiCad reachable from WSL; auto-detected, or pass `--kicad-cli`). If it is absent
+  the `.kicad_pcb` is still written and the Gerber step is skipped with an
+  actionable message — never treat that as success.
+- **The cross-ring phase interconnect is left as a ratsnest** for the user to route
+  in KiCad (`rep.ratsnest_joins` says how many joins remain). The coil copper is
+  netless graphic: the board is fully manufacturable and plots correctly, but it is
+  NOT connectivity-DRC-clean, and that final interconnect routing is the one manual
+  step. Do not claim the board is finished-and-routed when it is not.
 
 ## Reading the headline metrics (for answering questions)
 

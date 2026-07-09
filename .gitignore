@@ -1,10 +1,11 @@
+# environments / caches
 .venv/
 __pycache__/
+*.pyc
 *.egg-info/
 .pytest_cache/
 cachedir/
-designs/*/report.html
-designs/*/*.png
-designs/*/*.gif
-designs/*/*.csv
+.DS_Store
+
+# working area -- design sessions land here; the published designs live in examples/
 designs/

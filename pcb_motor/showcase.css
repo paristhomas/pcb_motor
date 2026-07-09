@@ -27,6 +27,8 @@
   --copper-back: #7d8fb5;
   --fr4: #3d6b4f;
   --pad: #d4a017;
+  --iron: #8a8f96;       /* back-iron / mild-steel return plate */
+  --iron-hi: #b9bec6;
   --accent: #2a78d6;
 }
 @media (prefers-color-scheme: dark) {
@@ -51,6 +53,8 @@
     --copper-back: #8fa3cc;
     --fr4: #35594a;
     --pad: #e0b23a;
+    --iron: #6f747b;
+    --iron-hi: #9aa0a8;
     --accent: #3987e5;
   }
 }
@@ -80,7 +84,7 @@ main, .hero-grid, .topnav { max-width: 1080px; margin: 0 auto; padding: 0 24px; 
 section { margin: 72px auto; }
 .kicker {
   font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--accent); margin-bottom: 6px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
 }
 h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.08; margin: 0.1em 0 0.35em; }
 h2 { font-size: 1.6rem; margin: 0 0 12px; }
@@ -110,9 +114,6 @@ figure { margin: 0; }
 /* ---------- hero ---------- */
 .hero {
   border-bottom: 1px solid var(--border);
-  background:
-    radial-gradient(1200px 500px at 75% -10%,
-      color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%);
   padding-bottom: 48px;
 }
 .topnav {
@@ -221,8 +222,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
 .chart-tip {
   position: fixed; z-index: 30; pointer-events: none;
   background: var(--surface); color: var(--ink);
-  border: 1px solid var(--border); border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border); border-radius: 6px;
   padding: 7px 10px; font-size: 0.78rem; line-height: 1.45;
   font-variant-numeric: tabular-nums; display: none; max-width: 260px;
 }
@@ -314,10 +314,8 @@ footer {
   text-align: center; color: var(--muted); font-size: 0.84rem;
 }
 
-/* subtle scroll reveal (no motion when the user asked for none) */
-.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
-.reveal.shown { opacity: 1; transform: none; }
+/* content is shown immediately -- no scroll-reveal motion (plain, static page) */
+.reveal, .reveal.shown { opacity: 1; transform: none; transition: none; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
 }
