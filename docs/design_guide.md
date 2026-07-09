@@ -133,9 +133,10 @@ Two things to know before sweeping these:
 - A **third ring** (`magnet_topology="round3"`, adding `mid_ring_r_m` / `mid_disc_d_m`)
   fills the radial band between the inner and outer rings. That band is empty of field
   but full of current-carrying copper, so a middle ring turns otherwise-idle copper into
-  torque (see [`examples/dualstator140-24n28p`](../examples/dualstator140-24n28p/README.md),
-  +21.8% torque). Keep **≥1 mm of carrier between every disc** — the engine warns below
-  that (both pole-to-pole and ring-to-ring), which caps the middle-disc diameter.
+  torque (see [`examples/dualstator140-24n28p`](../examples/dualstator140-24n28p/README.md)).
+  Size the discs so they **don't shrink going outward** (outer radius has more room and
+  more moment arm), and keep **≥0.8 mm of carrier between every disc** — the engine warns
+  below that (both pole-to-pole and ring-to-ring), which bounds where each ring can sit.
 
 Sanity-check the geometry after choosing radii/diameters: adjacent discs on a ring
 must not overlap, and see the Stage 7 carrier-wall note before you fall in love with

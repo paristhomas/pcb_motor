@@ -107,7 +107,7 @@ inner disc, same polarity. In round mode `pole_coverage` / `magnet_r_inner_m` /
 band between the two rings (idle current-carrying copper), use `magnet_topology=round3`
 with a middle ring (`mid_ring_r_m` / `mid_disc_d_m`) — it can add real torque.
 Buildability: adjacent discs need a real carrier wall between them — the engine now
-**warns when any two discs are <1 mm apart** (pole-to-pole *and* ring-to-ring), so watch
+**warns when any two discs are <0.8 mm apart** (pole-to-pole *and* ring-to-ring), so watch
 for that warning and shrink disc diameter / spread the rings / drop poles to clear it.
 The model will happily reward a 0.16 mm paper wall, so don't ignore the warning.
 
